@@ -29,31 +29,41 @@ Pour mettre à jour : `git pull` puis cliquer l'icône de rechargement sur la ca
 5. Répéter autant que nécessaire
 6. Dans le popup : **Copier pour Claude** → coller dans Claude Code
 
+### Widget
+
+- Toujours ouvert pendant une session, se déplace à la souris (glisse l'en-tête)
+- La position est mémorisée pour les sessions suivantes
+
 Raccourcis :
 
-- `Esc` ferme le panneau de commentaire, puis arrête la session
-- `⌘ / Ctrl + Entrée` enregistre le commentaire
+- `Alt+Shift+S` : active / désactive le sélecteur (personnalisable dans `chrome://extensions/shortcuts`)
+- `Esc` : ferme le panneau de commentaire, ou désactive le sélecteur
+- `⌘ / Ctrl + Entrée` : enregistre le commentaire en cours
 
-## Format d'export
+## Format d'export (JSON)
 
-```markdown
-# feeeeedback session
-
-- URL : https://exemple.com/page
-- Page : Titre de la page
-- Démarrée : 2026-04-21T10:00:00.000Z
-- Éléments : 2
-
-## Retours
-
-### 1. <button>
-- Sélecteur : `main > form > button.primary`
-- Texte : "Valider"
-- URL : https://exemple.com/page
-
-**Commentaire :**
-
-Le bouton est trop petit et mal aligné sur mobile.
+```json
+{
+  "tool": "feeeeedback",
+  "version": 1,
+  "session": {
+    "startedAt": "2026-04-21T10:00:00.000Z",
+    "startUrl": "https://exemple.com/page",
+    "startTitle": "Titre de la page"
+  },
+  "items": [
+    {
+      "index": 1,
+      "comment": "Le bouton est trop petit sur mobile.",
+      "selector": "main > form > button.primary",
+      "text": "Valider",
+      "tagName": "button",
+      "url": "https://exemple.com/page",
+      "pageTitle": "Titre de la page",
+      "createdAt": "2026-04-21T10:01:12.000Z"
+    }
+  ]
+}
 ```
 
 ## Structure

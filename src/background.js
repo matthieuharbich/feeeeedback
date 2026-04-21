@@ -80,11 +80,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse(session);
         break;
       }
+      case "GET_SHORTCUT": {
+        const commands = await chrome.commands.getAll();
+        const cmd = commands.find((c) => c.name === "toggle-picker");
+        sendResponse({ shortcut: cmd?.shortcut || "" });
+        break;
+      }
       default:
         sendResponse({ ok: false, error: "unknown message type" });
     }
   })();
   return true; // keep sendResponse async
+});
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "toggle-picker") return;
+  const tab = await chrome.tabs.query({ active: true, currentWindow: true }).then((t) => t[0]);
+  if (tab?.id) await sendToTab(tab.id, { type: "FF_TOGGLE_PICKER" });
 });
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {

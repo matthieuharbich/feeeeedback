@@ -1,6 +1,6 @@
 // feeeeedback — content script
 // Floating widget (always visible when session active) with picker toggle,
-// comment list, copy, stop. Selector mode is a sub-state of the session.
+// comment list, draggable header, keyboard shortcut, JSON export.
 
 (() => {
   if (window.__ff_injected__) return;
@@ -8,15 +8,21 @@
 
   const OUTLINE_CLASS = "ff-outline-hover";
   const MARKED_CLASS = "ff-marked";
+  const POS_KEY = "ff_widget_pos";
 
   let sessionActive = false;
   let pickerActive = false;
-  let expanded = true;
   let currentHover = null;
   let panelOpen = false;
   let panelEl = null;
   let widgetEl = null;
   let items = [];
+  let shortcutLabel = "Alt+Shift+S";
+
+  // drag state
+  let dragging = false;
+  let dragOffset = { x: 0, y: 0 };
+  let widgetPos = null;
 
   // --- selector generation ---------------------------------------------------
   function cssPath(el) {
@@ -52,7 +58,7 @@
 
   // --- picker handlers -------------------------------------------------------
   function onMouseOver(e) {
-    if (!pickerActive || panelOpen) return;
+    if (!pickerActive || panelOpen || dragging) return;
     if (isInsideUi(e.target)) return;
     if (currentHover) currentHover.classList.remove(OUTLINE_CLASS);
     currentHover = e.target;
@@ -202,6 +208,27 @@
   }
 
   // --- widget ----------------------------------------------------------------
+  function ensureWidget() {
+    if (widgetEl) return;
+    widgetEl = document.createElement("div");
+    widgetEl.className = "ff-widget";
+    document.documentElement.appendChild(widgetEl);
+    applyWidgetPosition();
+  }
+
+  function applyWidgetPosition() {
+    if (!widgetEl) return;
+    if (widgetPos && typeof widgetPos.top === "number" && typeof widgetPos.left === "number") {
+      const maxLeft = Math.max(0, window.innerWidth - (widgetEl.offsetWidth || 340));
+      const maxTop = Math.max(0, window.innerHeight - (widgetEl.offsetHeight || 120));
+      const left = Math.max(0, Math.min(maxLeft, widgetPos.left));
+      const top = Math.max(0, Math.min(maxTop, widgetPos.top));
+      widgetEl.style.left = `${left}px`;
+      widgetEl.style.top = `${top}px`;
+      widgetEl.style.right = "auto";
+    }
+  }
+
   function renderWidget() {
     if (!sessionActive) {
       if (widgetEl) {
@@ -210,43 +237,25 @@
       }
       return;
     }
-    if (!widgetEl) {
-      widgetEl = document.createElement("div");
-      widgetEl.className = "ff-widget";
-      document.documentElement.appendChild(widgetEl);
-    }
-    widgetEl.classList.toggle("ff-collapsed", !expanded);
-
-    if (!expanded) {
-      widgetEl.innerHTML = `
-        <button class="ff-pill" data-ff-expand title="Ouvrir feeeeedback">
-          <span class="ff-dot ${pickerActive ? "on" : "idle"}"></span>
-          <span class="ff-pill-label">feeeeedback</span>
-          <span class="ff-pill-count">${items.length}</span>
-        </button>
-      `;
-      widgetEl.querySelector("[data-ff-expand]").onclick = () => {
-        expanded = true;
-        renderWidget();
-      };
-      return;
-    }
+    ensureWidget();
 
     widgetEl.innerHTML = `
-      <div class="ff-widget-header">
+      <div class="ff-widget-header" data-ff-drag>
         <div class="ff-widget-title">
           <span class="ff-dot ${pickerActive ? "on" : "idle"}"></span>
           feeeeedback
           <span class="ff-badge">${items.length}</span>
         </div>
-        <button class="ff-icon-btn" data-ff-collapse title="Réduire">—</button>
+        <div class="ff-widget-header-actions">
+          <span class="ff-kbd" title="Raccourci sélecteur">${shortcutLabel}</span>
+        </div>
       </div>
       <button class="ff-toggle ${pickerActive ? "active" : ""}" data-ff-picker>
         ${pickerActive ? "● Sélecteur actif — clique un élément" : "○ Activer le sélecteur"}
       </button>
       <div class="ff-widget-list"></div>
       <div class="ff-widget-actions">
-        <button class="ff-btn ff-btn-primary" data-ff-copy ${items.length ? "" : "disabled"}>Copier</button>
+        <button class="ff-btn ff-btn-primary" data-ff-copy ${items.length ? "" : "disabled"}>Copier JSON</button>
         <button class="ff-btn ff-btn-ghost" data-ff-clear ${items.length ? "" : "disabled"}>Vider</button>
         <button class="ff-btn ff-btn-danger" data-ff-stop>Stop</button>
       </div>
@@ -258,7 +267,7 @@
       empty.className = "ff-empty";
       empty.textContent = pickerActive
         ? "Clique un élément de la page pour le commenter."
-        : "Active le sélecteur pour commencer.";
+        : `Active le sélecteur (${shortcutLabel}) pour commencer.`;
       list.appendChild(empty);
     } else {
       items.forEach((item, i) => {
@@ -285,10 +294,6 @@
       });
     }
 
-    widgetEl.querySelector("[data-ff-collapse]").onclick = () => {
-      expanded = false;
-      renderWidget();
-    };
     widgetEl.querySelector("[data-ff-picker]").onclick = () => setPicker(!pickerActive);
     widgetEl.querySelector("[data-ff-copy]").onclick = copyToClipboard;
     widgetEl.querySelector("[data-ff-clear]").onclick = async () => {
@@ -301,44 +306,76 @@
       await chrome.runtime.sendMessage({ type: "STOP_SESSION" });
       deactivateSession();
     };
+
+    // drag handle
+    const header = widgetEl.querySelector("[data-ff-drag]");
+    header.addEventListener("mousedown", onDragStart);
   }
 
+  // --- drag ------------------------------------------------------------------
+  function onDragStart(e) {
+    if (e.button !== 0) return;
+    if (e.target.closest("button")) return;
+    dragging = true;
+    const rect = widgetEl.getBoundingClientRect();
+    dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    document.addEventListener("mousemove", onDragMove, true);
+    document.addEventListener("mouseup", onDragEnd, true);
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onDragMove(e) {
+    if (!dragging || !widgetEl) return;
+    const maxLeft = Math.max(0, window.innerWidth - widgetEl.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - widgetEl.offsetHeight);
+    const left = Math.max(0, Math.min(maxLeft, e.clientX - dragOffset.x));
+    const top = Math.max(0, Math.min(maxTop, e.clientY - dragOffset.y));
+    widgetEl.style.left = `${left}px`;
+    widgetEl.style.top = `${top}px`;
+    widgetEl.style.right = "auto";
+    widgetPos = { top, left };
+  }
+
+  function onDragEnd() {
+    if (!dragging) return;
+    dragging = false;
+    document.removeEventListener("mousemove", onDragMove, true);
+    document.removeEventListener("mouseup", onDragEnd, true);
+    document.body.style.userSelect = "";
+    if (widgetPos) chrome.storage.local.set({ [POS_KEY]: widgetPos });
+  }
+
+  // --- clipboard -------------------------------------------------------------
   async function copyToClipboard() {
     const session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
-    const md = ffFormatSessionMarkdown(session);
+    const payload = ffFormatSessionJSON(session);
     const btn = widgetEl?.querySelector("[data-ff-copy]");
+    const ok = () => {
+      if (!btn) return;
+      btn.textContent = "Copié ✓";
+      btn.classList.add("ff-copied");
+      setTimeout(() => {
+        if (btn.isConnected) {
+          btn.textContent = "Copier JSON";
+          btn.classList.remove("ff-copied");
+        }
+      }, 1400);
+    };
     try {
-      await navigator.clipboard.writeText(md);
-      if (btn) {
-        btn.textContent = "Copié ✓";
-        btn.classList.add("ff-copied");
-        setTimeout(() => {
-          if (btn.isConnected) {
-            btn.textContent = "Copier";
-            btn.classList.remove("ff-copied");
-          }
-        }, 1400);
-      }
+      await navigator.clipboard.writeText(payload);
+      ok();
     } catch (err) {
-      // fallback for pages with clipboard restrictions
       const ta = document.createElement("textarea");
-      ta.value = md;
+      ta.value = payload;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
       try {
         document.execCommand("copy");
-        if (btn) {
-          btn.textContent = "Copié ✓";
-          btn.classList.add("ff-copied");
-          setTimeout(() => {
-            if (btn.isConnected) {
-              btn.textContent = "Copier";
-              btn.classList.remove("ff-copied");
-            }
-          }, 1400);
-        }
+        ok();
       } catch {
         alert("Copie impossible : " + err.message);
       } finally {
@@ -351,8 +388,14 @@
   async function activateSession() {
     if (sessionActive) return;
     sessionActive = true;
-    const session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
+    const [session, posRes, shortcutRes] = await Promise.all([
+      chrome.runtime.sendMessage({ type: "GET_SESSION" }),
+      chrome.storage.local.get(POS_KEY),
+      chrome.runtime.sendMessage({ type: "GET_SHORTCUT" }),
+    ]);
     items = session?.items || [];
+    widgetPos = posRes?.[POS_KEY] || null;
+    if (shortcutRes?.shortcut) shortcutLabel = shortcutRes.shortcut;
     document.addEventListener("keydown", onKeyDown, true);
     renderWidget();
   }
@@ -374,6 +417,9 @@
       } else if (msg.type === "FF_DEACTIVATE") {
         deactivateSession();
         sendResponse({ ok: true });
+      } else if (msg.type === "FF_TOGGLE_PICKER") {
+        if (sessionActive) setPicker(!pickerActive);
+        sendResponse({ ok: true, pickerActive });
       } else if (msg.type === "FF_REFRESH") {
         const s = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
         items = s?.items || [];

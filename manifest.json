@@ -22,6 +22,15 @@
   "background": {
     "service_worker": "src/background.js"
   },
+  "commands": {
+    "toggle-picker": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "Activer / désactiver le sélecteur feeeeedback"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

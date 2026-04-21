@@ -51,12 +51,12 @@ clearBtn.addEventListener("click", async () => {
 
 copyBtn.addEventListener("click", async () => {
   const session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
-  const md = ffFormatSessionMarkdown(session);
-  await navigator.clipboard.writeText(md);
+  const payload = ffFormatSessionJSON(session);
+  await navigator.clipboard.writeText(payload);
   copyBtn.textContent = "Copié ✓";
   copyBtn.classList.add("copied");
   setTimeout(() => {
-    copyBtn.textContent = "Copier pour Claude";
+    copyBtn.textContent = "Copier JSON";
     copyBtn.classList.remove("copied");
   }, 1400);
 });
