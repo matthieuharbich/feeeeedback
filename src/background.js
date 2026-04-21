@@ -57,6 +57,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         break;
       }
+      case "CLEAR_ITEMS": {
+        const session = await getSession();
+        session.items = [];
+        await setSession(session);
+        const tab = await chrome.tabs.query({ active: true, currentWindow: true }).then((t) => t[0]);
+        if (tab?.id) await sendToTab(tab.id, { type: "FF_REFRESH" });
+        sendResponse(session);
+        break;
+      }
       case "ADD_ITEM": {
         const session = await getSession();
         session.items.push({ id: crypto.randomUUID(), ...msg.item });

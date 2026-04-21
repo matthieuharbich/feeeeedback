@@ -1,5 +1,6 @@
 // feeeeedback — content script
-// Picker UI: hover-outline, click to capture, floating comment panel.
+// Floating widget (always visible when session active) with picker toggle,
+// comment list, copy, stop. Selector mode is a sub-state of the session.
 
 (() => {
   if (window.__ff_injected__) return;
@@ -7,9 +8,15 @@
 
   const OUTLINE_CLASS = "ff-outline-hover";
   const MARKED_CLASS = "ff-marked";
-  let active = false;
-  let panelOpen = false;
+
+  let sessionActive = false;
+  let pickerActive = false;
+  let expanded = true;
   let currentHover = null;
+  let panelOpen = false;
+  let panelEl = null;
+  let widgetEl = null;
+  let items = [];
 
   // --- selector generation ---------------------------------------------------
   function cssPath(el) {
@@ -39,18 +46,21 @@
     return path.join(" > ");
   }
 
+  function isInsideUi(el) {
+    return el && el.closest && (el.closest(".ff-panel") || el.closest(".ff-widget"));
+  }
+
   // --- picker handlers -------------------------------------------------------
   function onMouseOver(e) {
-    if (!active || panelOpen) return;
-    const target = e.target;
-    if (isInsideUi(target)) return;
+    if (!pickerActive || panelOpen) return;
+    if (isInsideUi(e.target)) return;
     if (currentHover) currentHover.classList.remove(OUTLINE_CLASS);
-    currentHover = target;
+    currentHover = e.target;
     currentHover.classList.add(OUTLINE_CLASS);
   }
 
   function onMouseOut(e) {
-    if (!active) return;
+    if (!pickerActive) return;
     if (e.target === currentHover) {
       currentHover.classList.remove(OUTLINE_CLASS);
       currentHover = null;
@@ -58,28 +68,45 @@
   }
 
   function onClick(e) {
-    if (!active || panelOpen) return;
-    const target = e.target;
-    if (isInsideUi(target)) return;
+    if (!pickerActive || panelOpen) return;
+    if (isInsideUi(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
     if (currentHover) currentHover.classList.remove(OUTLINE_CLASS);
-    openCommentPanel(target);
+    openCommentPanel(e.target);
   }
 
   function onKeyDown(e) {
-    if (!active) return;
+    if (!sessionActive) return;
     if (e.key === "Escape") {
-      if (panelOpen) closeCommentPanel();
-      else deactivate();
+      if (panelOpen) closeCommentPanel(true);
+      else if (pickerActive) setPicker(false);
     }
   }
 
+  function setPicker(on) {
+    if (on === pickerActive) return;
+    pickerActive = on;
+    if (on) {
+      document.addEventListener("mouseover", onMouseOver, true);
+      document.addEventListener("mouseout", onMouseOut, true);
+      document.addEventListener("click", onClick, true);
+    } else {
+      document.removeEventListener("mouseover", onMouseOver, true);
+      document.removeEventListener("mouseout", onMouseOut, true);
+      document.removeEventListener("click", onClick, true);
+      if (currentHover) currentHover.classList.remove(OUTLINE_CLASS);
+      currentHover = null;
+    }
+    renderWidget();
+  }
+
   // --- comment panel ---------------------------------------------------------
-  let panelEl = null;
+  let panelTarget = null;
 
   function openCommentPanel(target) {
     panelOpen = true;
+    panelTarget = target;
     target.classList.add(MARKED_CLASS);
     const selector = cssPath(target);
     const text = (target.innerText || target.value || target.alt || "").trim().slice(0, 200);
@@ -90,11 +117,11 @@
     panelEl.innerHTML = `
       <div class="ff-panel-header">
         <span class="ff-panel-title">feeeeedback</span>
-        <button class="ff-btn ff-btn-ghost" data-ff-close>✕</button>
+        <button class="ff-icon-btn" data-ff-close title="Fermer">✕</button>
       </div>
       <div class="ff-panel-meta">
-        <div class="ff-panel-selector" title="Sélecteur CSS"></div>
-        <div class="ff-panel-text" title="Texte de l'élément"></div>
+        <div class="ff-panel-selector"></div>
+        <div class="ff-panel-text"></div>
       </div>
       <textarea class="ff-panel-textarea" placeholder="Ton commentaire…" rows="4"></textarea>
       <div class="ff-panel-actions">
@@ -111,36 +138,32 @@
     const textarea = panelEl.querySelector(".ff-panel-textarea");
     textarea.focus();
 
-    panelEl.querySelector("[data-ff-close]").addEventListener("click", () => {
-      target.classList.remove(MARKED_CLASS);
-      closeCommentPanel();
-    });
-    panelEl.querySelector("[data-ff-cancel]").addEventListener("click", () => {
-      target.classList.remove(MARKED_CLASS);
-      closeCommentPanel();
-    });
+    panelEl.querySelector("[data-ff-close]").addEventListener("click", () => closeCommentPanel(true));
+    panelEl.querySelector("[data-ff-cancel]").addEventListener("click", () => closeCommentPanel(true));
     panelEl.querySelector("[data-ff-save]").addEventListener("click", async () => {
       const comment = textarea.value.trim();
       if (!comment) {
         textarea.focus();
         return;
       }
-      await chrome.runtime.sendMessage({
-        type: "ADD_ITEM",
-        item: {
-          selector,
-          text,
-          comment,
-          tagName: target.tagName.toLowerCase(),
-          url: location.href,
-          createdAt: new Date().toISOString(),
-        },
+      await saveItem({
+        selector,
+        text,
+        comment,
+        tagName: target.tagName.toLowerCase(),
+        url: location.href,
+        pageTitle: document.title,
+        createdAt: new Date().toISOString(),
       });
-      closeCommentPanel();
+      closeCommentPanel(false);
     });
     textarea.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         panelEl.querySelector("[data-ff-save]").click();
+      }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeCommentPanel(true);
       }
     });
   }
@@ -162,7 +185,9 @@
     panelEl.style.left = `${Math.max(margin, left)}px`;
   }
 
-  function closeCommentPanel() {
+  function closeCommentPanel(unmark) {
+    if (panelTarget && unmark) panelTarget.classList.remove(MARKED_CLASS);
+    panelTarget = null;
     if (panelEl) {
       panelEl.remove();
       panelEl = null;
@@ -170,73 +195,199 @@
     panelOpen = false;
   }
 
-  function isInsideUi(el) {
-    return el.closest && (el.closest(".ff-panel") || el.closest(".ff-banner"));
+  async function saveItem(data) {
+    const updated = await chrome.runtime.sendMessage({ type: "ADD_ITEM", item: data });
+    items = updated.items || [];
+    renderWidget();
   }
 
-  // --- activation ------------------------------------------------------------
-  let bannerEl = null;
+  // --- widget ----------------------------------------------------------------
+  function renderWidget() {
+    if (!sessionActive) {
+      if (widgetEl) {
+        widgetEl.remove();
+        widgetEl = null;
+      }
+      return;
+    }
+    if (!widgetEl) {
+      widgetEl = document.createElement("div");
+      widgetEl.className = "ff-widget";
+      document.documentElement.appendChild(widgetEl);
+    }
+    widgetEl.classList.toggle("ff-collapsed", !expanded);
 
-  function activate() {
-    if (active) return;
-    active = true;
-    document.addEventListener("mouseover", onMouseOver, true);
-    document.addEventListener("mouseout", onMouseOut, true);
-    document.addEventListener("click", onClick, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    showBanner();
-  }
+    if (!expanded) {
+      widgetEl.innerHTML = `
+        <button class="ff-pill" data-ff-expand title="Ouvrir feeeeedback">
+          <span class="ff-dot ${pickerActive ? "on" : "idle"}"></span>
+          <span class="ff-pill-label">feeeeedback</span>
+          <span class="ff-pill-count">${items.length}</span>
+        </button>
+      `;
+      widgetEl.querySelector("[data-ff-expand]").onclick = () => {
+        expanded = true;
+        renderWidget();
+      };
+      return;
+    }
 
-  function deactivate() {
-    if (!active) return;
-    active = false;
-    document.removeEventListener("mouseover", onMouseOver, true);
-    document.removeEventListener("mouseout", onMouseOut, true);
-    document.removeEventListener("click", onClick, true);
-    document.removeEventListener("keydown", onKeyDown, true);
-    if (currentHover) currentHover.classList.remove(OUTLINE_CLASS);
-    currentHover = null;
-    closeCommentPanel();
-    hideBanner();
-    chrome.runtime.sendMessage({ type: "STOP_SESSION" });
-  }
-
-  function showBanner() {
-    if (bannerEl) return;
-    bannerEl = document.createElement("div");
-    bannerEl.className = "ff-banner";
-    bannerEl.innerHTML = `
-      <span class="ff-banner-dot"></span>
-      <span>feeeeedback actif — clique un élément pour commenter</span>
-      <button class="ff-btn ff-btn-ghost" data-ff-stop>Stop</button>
+    widgetEl.innerHTML = `
+      <div class="ff-widget-header">
+        <div class="ff-widget-title">
+          <span class="ff-dot ${pickerActive ? "on" : "idle"}"></span>
+          feeeeedback
+          <span class="ff-badge">${items.length}</span>
+        </div>
+        <button class="ff-icon-btn" data-ff-collapse title="Réduire">—</button>
+      </div>
+      <button class="ff-toggle ${pickerActive ? "active" : ""}" data-ff-picker>
+        ${pickerActive ? "● Sélecteur actif — clique un élément" : "○ Activer le sélecteur"}
+      </button>
+      <div class="ff-widget-list"></div>
+      <div class="ff-widget-actions">
+        <button class="ff-btn ff-btn-primary" data-ff-copy ${items.length ? "" : "disabled"}>Copier</button>
+        <button class="ff-btn ff-btn-ghost" data-ff-clear ${items.length ? "" : "disabled"}>Vider</button>
+        <button class="ff-btn ff-btn-danger" data-ff-stop>Stop</button>
+      </div>
     `;
-    document.documentElement.appendChild(bannerEl);
-    bannerEl.querySelector("[data-ff-stop]").addEventListener("click", deactivate);
+
+    const list = widgetEl.querySelector(".ff-widget-list");
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "ff-empty";
+      empty.textContent = pickerActive
+        ? "Clique un élément de la page pour le commenter."
+        : "Active le sélecteur pour commencer.";
+      list.appendChild(empty);
+    } else {
+      items.forEach((item, i) => {
+        const el = document.createElement("div");
+        el.className = "ff-widget-item";
+        el.innerHTML = `
+          <div class="ff-item-index">${i + 1}</div>
+          <div class="ff-item-body">
+            <div class="ff-item-comment"></div>
+            <div class="ff-item-selector"></div>
+            <div class="ff-item-url"></div>
+          </div>
+          <button class="ff-icon-btn" data-ff-remove title="Supprimer">✕</button>
+        `;
+        el.querySelector(".ff-item-comment").textContent = item.comment;
+        el.querySelector(".ff-item-selector").textContent = item.selector;
+        el.querySelector(".ff-item-url").textContent = ffShortUrl(item.url);
+        el.querySelector("[data-ff-remove]").onclick = async () => {
+          const updated = await chrome.runtime.sendMessage({ type: "REMOVE_ITEM", id: item.id });
+          items = updated.items || [];
+          renderWidget();
+        };
+        list.appendChild(el);
+      });
+    }
+
+    widgetEl.querySelector("[data-ff-collapse]").onclick = () => {
+      expanded = false;
+      renderWidget();
+    };
+    widgetEl.querySelector("[data-ff-picker]").onclick = () => setPicker(!pickerActive);
+    widgetEl.querySelector("[data-ff-copy]").onclick = copyToClipboard;
+    widgetEl.querySelector("[data-ff-clear]").onclick = async () => {
+      if (!confirm("Vider la session en cours ?")) return;
+      await chrome.runtime.sendMessage({ type: "CLEAR_ITEMS" });
+      items = [];
+      renderWidget();
+    };
+    widgetEl.querySelector("[data-ff-stop]").onclick = async () => {
+      await chrome.runtime.sendMessage({ type: "STOP_SESSION" });
+      deactivateSession();
+    };
   }
 
-  function hideBanner() {
-    if (bannerEl) {
-      bannerEl.remove();
-      bannerEl = null;
+  async function copyToClipboard() {
+    const session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
+    const md = ffFormatSessionMarkdown(session);
+    const btn = widgetEl?.querySelector("[data-ff-copy]");
+    try {
+      await navigator.clipboard.writeText(md);
+      if (btn) {
+        btn.textContent = "Copié ✓";
+        btn.classList.add("ff-copied");
+        setTimeout(() => {
+          if (btn.isConnected) {
+            btn.textContent = "Copier";
+            btn.classList.remove("ff-copied");
+          }
+        }, 1400);
+      }
+    } catch (err) {
+      // fallback for pages with clipboard restrictions
+      const ta = document.createElement("textarea");
+      ta.value = md;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        if (btn) {
+          btn.textContent = "Copié ✓";
+          btn.classList.add("ff-copied");
+          setTimeout(() => {
+            if (btn.isConnected) {
+              btn.textContent = "Copier";
+              btn.classList.remove("ff-copied");
+            }
+          }, 1400);
+        }
+      } catch {
+        alert("Copie impossible : " + err.message);
+      } finally {
+        ta.remove();
+      }
     }
   }
 
-  // --- message handler -------------------------------------------------------
+  // --- session lifecycle -----------------------------------------------------
+  async function activateSession() {
+    if (sessionActive) return;
+    sessionActive = true;
+    const session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
+    items = session?.items || [];
+    document.addEventListener("keydown", onKeyDown, true);
+    renderWidget();
+  }
+
+  function deactivateSession() {
+    sessionActive = false;
+    setPicker(false);
+    closeCommentPanel(true);
+    document.removeEventListener("keydown", onKeyDown, true);
+    renderWidget();
+  }
+
+  // --- messages from background / popup --------------------------------------
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.type === "FF_ACTIVATE") {
-      activate();
-      sendResponse({ ok: true });
-    } else if (msg.type === "FF_DEACTIVATE") {
-      deactivate();
-      sendResponse({ ok: true });
-    } else if (msg.type === "FF_PING") {
-      sendResponse({ ok: true, active });
-    }
+    (async () => {
+      if (msg.type === "FF_ACTIVATE") {
+        await activateSession();
+        sendResponse({ ok: true });
+      } else if (msg.type === "FF_DEACTIVATE") {
+        deactivateSession();
+        sendResponse({ ok: true });
+      } else if (msg.type === "FF_REFRESH") {
+        const s = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
+        items = s?.items || [];
+        renderWidget();
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false });
+      }
+    })();
     return true;
   });
 
-  // Re-activate if session was left active (e.g. tab switch)
+  // --- re-hydrate on page load ----------------------------------------------
   chrome.runtime.sendMessage({ type: "GET_SESSION" }, (session) => {
-    if (session && session.active && session.url === location.href) activate();
+    if (session && session.active) activateSession();
   });
 })();

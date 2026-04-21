@@ -11,23 +11,23 @@
       <span id="status" class="status status-off">inactif</span>
     </header>
 
-    <section class="actions">
-      <button id="toggleBtn" class="btn btn-primary">Démarrer une session</button>
-      <button id="copyBtn" class="btn">Copier pour Claude</button>
-      <button id="clearBtn" class="btn btn-ghost">Vider</button>
-    </section>
+    <button id="toggleBtn" class="btn btn-primary">Démarrer une session</button>
 
-    <section class="meta">
-      <div><span>Page :</span> <span id="url">—</span></div>
+    <p class="hint" id="hint">
+      Une fois lancée, la session affiche un widget flottant en haut à droite de la page. Tu peux naviguer librement et activer / désactiver le sélecteur quand tu veux.
+    </p>
+
+    <section class="meta" id="meta" hidden>
       <div><span>Éléments :</span> <span id="count">0</span></div>
+      <div><span>Démarrée sur :</span> <span id="url">—</span></div>
     </section>
 
-    <section id="items" class="items"></section>
+    <section class="actions" id="extraActions" hidden>
+      <button id="copyBtn" class="btn">Copier pour Claude</button>
+      <button id="clearBtn" class="btn btn-ghost">Vider la session</button>
+    </section>
 
-    <footer>
-      <span class="hint">Clique un élément pour le commenter · ESC pour arrêter</span>
-    </footer>
-
+    <script src="format.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

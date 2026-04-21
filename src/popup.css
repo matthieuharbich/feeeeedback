@@ -9,18 +9,20 @@ body {
 }
 
 body {
-  width: 340px;
+  width: 300px;
   background: #111;
   color: #f5f5f5;
   font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
 }
 
 h1 {
@@ -45,13 +47,6 @@ h1 {
 .status-on {
   background: #ff6b35;
   color: #111;
-}
-
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
 }
 
 .btn {
@@ -79,19 +74,37 @@ h1 {
   background: #e85a27;
 }
 
+.btn-danger {
+  background: #2a1515;
+  color: #ff6b6b;
+  border: 1px solid #3a2525;
+}
+
+.btn-danger:hover {
+  background: #3a1f1f;
+}
+
 .btn-ghost {
   background: transparent;
   color: #888;
+  border: 1px solid #2a2a2a;
 }
 
 .btn-ghost:hover {
-  background: #222;
+  background: #1a1a1a;
   color: #f5f5f5;
 }
 
 .btn.copied {
   background: #4ade80;
   color: #111;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.5;
 }
 
 .meta {
@@ -103,7 +116,6 @@ h1 {
   padding: 8px 10px;
   background: #1a1a1a;
   border-radius: 8px;
-  margin-bottom: 10px;
 }
 
 .meta span:first-child {
@@ -112,75 +124,13 @@ h1 {
 
 #url {
   color: #ddd;
-  word-break: break-all;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
+  word-break: break-all;
 }
 
-.items {
-  max-height: 220px;
-  overflow-y: auto;
+.actions {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 10px;
-}
-
-.item {
-  background: #1a1a1a;
-  border-radius: 8px;
-  padding: 8px 10px;
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.item-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.item-selector {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  color: #ff6b35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.item-comment {
-  color: #ddd;
-  font-size: 12px;
-  margin-top: 2px;
-  word-break: break-word;
-}
-
-.item-remove {
-  border: 0;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 0 2px;
-}
-
-.item-remove:hover {
-  color: #ff6b35;
-}
-
-.empty {
-  color: #666;
-  font-style: italic;
-  text-align: center;
-  padding: 12px;
-}
-
-footer {
-  text-align: center;
-}
-
-.hint {
-  font-size: 11px;
-  color: #666;
 }

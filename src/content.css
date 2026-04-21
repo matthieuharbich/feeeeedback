@@ -1,3 +1,4 @@
+/* ===== element picker highlights ===== */
 .ff-outline-hover {
   outline: 2px dashed #ff6b35 !important;
   outline-offset: 2px !important;
@@ -9,30 +10,104 @@
   outline-offset: 2px !important;
 }
 
-.ff-banner {
+/* ===== floating widget ===== */
+.ff-widget {
   position: fixed !important;
   top: 12px !important;
   right: 12px !important;
   z-index: 2147483646 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  padding: 8px 12px !important;
+  width: 340px !important;
+  max-height: calc(100vh - 24px) !important;
   background: #111 !important;
-  color: #fff !important;
-  border-radius: 10px !important;
-  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35) !important;
+  color: #f5f5f5 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
+  padding: 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
   pointer-events: auto !important;
+  box-sizing: border-box !important;
 }
 
-.ff-banner-dot {
+.ff-widget.ff-collapsed {
+  width: auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ff-pill {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: #111 !important;
+  color: #f5f5f5 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+  cursor: pointer !important;
+  font: inherit !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+.ff-pill:hover {
+  background: #1a1a1a !important;
+}
+
+.ff-pill-label {
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.ff-pill-count {
+  background: #ff6b35 !important;
+  color: #111 !important;
+  border-radius: 999px !important;
+  padding: 1px 8px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+
+.ff-widget-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.ff-widget-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.ff-badge {
+  background: #2a2a2a !important;
+  color: #aaa !important;
+  border-radius: 999px !important;
+  padding: 1px 8px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+.ff-dot {
   width: 8px !important;
   height: 8px !important;
   border-radius: 50% !important;
+  background: #555 !important;
+  flex-shrink: 0 !important;
+}
+
+.ff-dot.on {
   background: #ff6b35 !important;
-  box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.6) !important;
   animation: ff-pulse 1.6s infinite !important;
+}
+
+.ff-dot.idle {
+  background: #4ade80 !important;
 }
 
 @keyframes ff-pulse {
@@ -47,6 +122,132 @@
   }
 }
 
+.ff-toggle {
+  border: 1px solid #2a2a2a !important;
+  background: #1a1a1a !important;
+  color: #ddd !important;
+  border-radius: 8px !important;
+  padding: 9px 12px !important;
+  font: inherit !important;
+  cursor: pointer !important;
+  text-align: center !important;
+  transition: all 0.15s !important;
+}
+
+.ff-toggle:hover {
+  background: #222 !important;
+}
+
+.ff-toggle.active {
+  background: #ff6b35 !important;
+  color: #111 !important;
+  border-color: #ff6b35 !important;
+  font-weight: 600 !important;
+}
+
+.ff-toggle.active:hover {
+  background: #e85a27 !important;
+}
+
+.ff-widget-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: 40vh !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  padding: 2px !important;
+  margin: 0 -2px !important;
+}
+
+.ff-widget-list::-webkit-scrollbar {
+  width: 6px !important;
+}
+.ff-widget-list::-webkit-scrollbar-thumb {
+  background: #333 !important;
+  border-radius: 3px !important;
+}
+
+.ff-empty {
+  color: #666 !important;
+  font-style: italic !important;
+  text-align: center !important;
+  padding: 18px 8px !important;
+  font-size: 12px !important;
+}
+
+.ff-widget-item {
+  background: #1a1a1a !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  display: flex !important;
+  gap: 8px !important;
+  align-items: flex-start !important;
+}
+
+.ff-item-index {
+  background: #2a2a2a !important;
+  color: #aaa !important;
+  border-radius: 999px !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  flex-shrink: 0 !important;
+  margin-top: 2px !important;
+}
+
+.ff-item-body {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.ff-item-comment {
+  color: #f0f0f0 !important;
+  font-size: 12px !important;
+  word-break: break-word !important;
+  line-height: 1.4 !important;
+}
+
+.ff-item-selector {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 10px !important;
+  color: #ff6b35 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin-top: 3px !important;
+}
+
+.ff-item-url {
+  font-size: 10px !important;
+  color: #666 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin-top: 1px !important;
+}
+
+.ff-widget-actions {
+  display: flex !important;
+  gap: 6px !important;
+  margin-top: 2px !important;
+}
+
+.ff-widget-actions .ff-btn {
+  flex: 1 !important;
+}
+
+.ff-widget-actions .ff-btn-ghost,
+.ff-widget-actions .ff-btn-danger {
+  flex: 0 0 auto !important;
+}
+
+/* ===== comment panel (popup on element click) ===== */
 .ff-panel {
   position: absolute !important;
   z-index: 2147483647 !important;
@@ -61,6 +262,7 @@
   flex-direction: column !important;
   gap: 10px !important;
   pointer-events: auto !important;
+  box-sizing: border-box !important;
 }
 
 .ff-panel-header {
@@ -72,6 +274,7 @@
 .ff-panel-title {
   font-weight: 700 !important;
   letter-spacing: 0.02em !important;
+  color: #111 !important;
 }
 
 .ff-panel-meta {
@@ -123,28 +326,85 @@
   gap: 8px !important;
 }
 
+/* ===== shared buttons ===== */
 .ff-btn {
   border: 0 !important;
-  padding: 6px 12px !important;
+  padding: 7px 12px !important;
   border-radius: 8px !important;
   font: inherit !important;
   cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+
+.ff-btn:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
 }
 
 .ff-btn-primary {
   background: #ff6b35 !important;
-  color: #fff !important;
+  color: #111 !important;
+  font-weight: 600 !important;
 }
 
-.ff-btn-primary:hover {
+.ff-btn-primary:hover:not(:disabled) {
   background: #e85a27 !important;
+}
+
+.ff-btn-primary.ff-copied {
+  background: #4ade80 !important;
+  color: #111 !important;
 }
 
 .ff-btn-ghost {
   background: transparent !important;
-  color: #666 !important;
+  color: #aaa !important;
+  border: 1px solid #2a2a2a !important;
 }
 
-.ff-btn-ghost:hover {
+.ff-btn-ghost:hover:not(:disabled) {
+  background: #1a1a1a !important;
+  color: #f5f5f5 !important;
+}
+
+.ff-btn-danger {
+  background: transparent !important;
+  color: #ff6b6b !important;
+  border: 1px solid #2a2a2a !important;
+}
+
+.ff-btn-danger:hover:not(:disabled) {
+  background: #2a1515 !important;
+  border-color: #ff6b6b !important;
+}
+
+/* panel variant (on light bg) */
+.ff-panel .ff-btn-ghost {
+  color: #666 !important;
+  border-color: #eee !important;
+}
+
+.ff-panel .ff-btn-ghost:hover:not(:disabled) {
   background: #f0f0f0 !important;
+  color: #111 !important;
+}
+
+.ff-icon-btn {
+  border: 0 !important;
+  background: transparent !important;
+  color: #888 !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  line-height: 1 !important;
+}
+
+.ff-icon-btn:hover {
+  background: rgba(255, 107, 53, 0.15) !important;
+  color: #ff6b35 !important;
+}
+
+.ff-panel .ff-icon-btn {
+  color: #aaa !important;
 }
