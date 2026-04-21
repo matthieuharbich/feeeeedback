@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>feeeeedback</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>feeeeedback</h1>
+      <span id="status" class="status status-off">inactif</span>
+    </header>
+
+    <section class="actions">
+      <button id="toggleBtn" class="btn btn-primary">Démarrer une session</button>
+      <button id="copyBtn" class="btn">Copier pour Claude</button>
+      <button id="clearBtn" class="btn btn-ghost">Vider</button>
+    </section>
+
+    <section class="meta">
+      <div><span>Page :</span> <span id="url">—</span></div>
+      <div><span>Éléments :</span> <span id="count">0</span></div>
+    </section>
+
+    <section id="items" class="items"></section>
+
+    <footer>
+      <span class="hint">Clique un élément pour le commenter · ESC pour arrêter</span>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

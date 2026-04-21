@@ -1,0 +1,150 @@
+.ff-outline-hover {
+  outline: 2px dashed #ff6b35 !important;
+  outline-offset: 2px !important;
+  cursor: crosshair !important;
+}
+
+.ff-marked {
+  outline: 2px solid #ff6b35 !important;
+  outline-offset: 2px !important;
+}
+
+.ff-banner {
+  position: fixed !important;
+  top: 12px !important;
+  right: 12px !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 12px !important;
+  background: #111 !important;
+  color: #fff !important;
+  border-radius: 10px !important;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35) !important;
+  pointer-events: auto !important;
+}
+
+.ff-banner-dot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: #ff6b35 !important;
+  box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.6) !important;
+  animation: ff-pulse 1.6s infinite !important;
+}
+
+@keyframes ff-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 107, 53, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 53, 0);
+  }
+}
+
+.ff-panel {
+  position: absolute !important;
+  z-index: 2147483647 !important;
+  width: 360px !important;
+  background: #fff !important;
+  color: #111 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25) !important;
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
+  padding: 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  pointer-events: auto !important;
+}
+
+.ff-panel-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.ff-panel-title {
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.ff-panel-meta {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  background: #f5f5f5 !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+}
+
+.ff-panel-selector {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 11px !important;
+  color: #333 !important;
+  word-break: break-all !important;
+}
+
+.ff-panel-text {
+  font-size: 12px !important;
+  color: #666 !important;
+  font-style: italic !important;
+  max-height: 40px !important;
+  overflow: hidden !important;
+}
+
+.ff-panel-textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border: 1px solid #ddd !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  font: inherit !important;
+  color: #111 !important;
+  background: #fff !important;
+  resize: vertical !important;
+  min-height: 64px !important;
+}
+
+.ff-panel-textarea:focus {
+  outline: 2px solid #ff6b35 !important;
+  outline-offset: 0 !important;
+  border-color: transparent !important;
+}
+
+.ff-panel-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.ff-btn {
+  border: 0 !important;
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  font: inherit !important;
+  cursor: pointer !important;
+}
+
+.ff-btn-primary {
+  background: #ff6b35 !important;
+  color: #fff !important;
+}
+
+.ff-btn-primary:hover {
+  background: #e85a27 !important;
+}
+
+.ff-btn-ghost {
+  background: transparent !important;
+  color: #666 !important;
+}
+
+.ff-btn-ghost:hover {
+  background: #f0f0f0 !important;
+}
