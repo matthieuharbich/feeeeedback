@@ -27,6 +27,9 @@ zip -r "$VERSIONED" \
 
 cp "$VERSIONED" "$LATEST"
 
+# Ship the version string so the /install page can display the current version
+echo "$VERSION" > "$ROOT/dashboard/public/extension-version.txt"
+
 cd "$ROOT"
 SIZE=$(du -h "$VERSIONED" | cut -f1)
 echo "✓ $VERSIONED ($SIZE)"

@@ -6,9 +6,8 @@ import { Logo } from "@/components/logo";
 
 function getVersion() {
   try {
-    const p = path.join(process.cwd(), "..", "extension", "manifest.json");
-    const raw = readFileSync(p, "utf8");
-    return JSON.parse(raw).version as string;
+    const p = path.join(process.cwd(), "public", "extension-version.txt");
+    return readFileSync(p, "utf8").trim() || "latest";
   } catch {
     return "latest";
   }
