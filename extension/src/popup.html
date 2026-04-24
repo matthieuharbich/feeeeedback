@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>feeeeedback</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>feeeeedback</h1>
+      <span id="status" class="status status-off">inactif</span>
+    </header>
+
+    <!-- Auth states -->
+    <section id="authSection">
+      <div id="authNone" hidden>
+        <p class="hint">
+          Connecte l'extension à ton compte pour retrouver tes retours dans le dashboard.
+        </p>
+        <button id="loginBtn" class="btn btn-primary">Se connecter</button>
+        <div class="or">ou</div>
+        <button id="localStartBtn" class="btn btn-ghost">Utiliser en mode local</button>
+      </div>
+
+      <div id="authLoaded" hidden>
+        <div class="user-row">
+          <div class="user-avatar" id="userAvatar">—</div>
+          <div class="user-info">
+            <div class="user-name" id="userName"></div>
+            <div class="user-email" id="userEmail"></div>
+          </div>
+          <button id="signOutBtn" class="icon-btn" title="Se déconnecter">×</button>
+        </div>
+
+        <div class="field">
+          <label>Projet</label>
+          <select id="projectSelect" class="select"></select>
+        </div>
+
+        <div class="page-url">
+          <span>Page :</span>
+          <span id="tabUrl">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="sessionActions" hidden>
+      <button id="toggleBtn" class="btn btn-primary">Démarrer une session</button>
+    </section>
+
+    <section class="meta" id="meta" hidden>
+      <div><span>Éléments :</span> <span id="count">0</span></div>
+      <div><span>Projet :</span> <span id="projectLabel">Local</span></div>
+    </section>
+
+    <section class="actions" id="extraActions" hidden>
+      <button id="copyBtn" class="btn btn-ghost">Copier JSON</button>
+      <button id="dashBtn" class="btn btn-ghost" hidden>Ouvrir le dashboard</button>
+      <button id="clearBtn" class="btn btn-ghost">Vider la session</button>
+    </section>
+
+    <footer class="foot">
+      <span class="hint-xs">Alt+Shift+S pour toggler le sélecteur</span>
+    </footer>
+
+    <script src="format.js"></script>
+    <script src="api.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

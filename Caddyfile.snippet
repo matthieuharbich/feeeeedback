@@ -1,0 +1,7 @@
+# Snippet to add to your existing Caddyfile on the VPS.
+# Assumes feeeeedback-dashboard container is bound to 127.0.0.1:3210.
+
+feeeeedback.mtth.world {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3210
+}

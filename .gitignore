@@ -1,8 +1,24 @@
 .DS_Store
 node_modules/
+.next/
+.turbo/
+out/
+dist/
 *.log
 *.zip
 .vscode/
 .idea/
 .claude-flow/
 .claude/
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# uploads
+dashboard/uploads/
+
+# drizzle artifacts
+dashboard/drizzle/meta/_journal.json.lock

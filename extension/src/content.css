@@ -77,6 +77,25 @@
   font-weight: 600 !important;
 }
 
+.ff-mode-badge {
+  background: #ff6b35 !important;
+  color: #111 !important;
+  border-radius: 999px !important;
+  padding: 1px 8px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+  max-width: 120px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ff-mode-badge.ff-mode-local {
+  background: #333 !important;
+  color: #888 !important;
+}
+
 .ff-dot {
   width: 8px !important;
   height: 8px !important;

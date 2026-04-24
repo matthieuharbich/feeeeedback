@@ -17,6 +17,7 @@
   let panelEl = null;
   let widgetEl = null;
   let items = [];
+  let sessionMeta = null;
   let shortcutLabel = "Alt+Shift+S";
 
   // drag state
@@ -152,16 +153,48 @@
         textarea.focus();
         return;
       }
-      await saveItem({
-        selector,
-        text,
-        comment,
-        tagName: target.tagName.toLowerCase(),
-        url: location.href,
-        pageTitle: document.title,
-        createdAt: new Date().toISOString(),
-      });
-      closeCommentPanel(false);
+      const saveBtn = panelEl.querySelector("[data-ff-save]");
+      const prevLabel = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = sessionMeta?.mode === "cloud" ? "Envoi…" : "Enregistrement…";
+      try {
+        const elementRect = {
+          x: rect.left + window.scrollX,
+          y: rect.top + window.scrollY,
+          width: rect.width,
+          height: rect.height,
+        };
+        await saveItem({
+          selector,
+          text,
+          comment,
+          tagName: target.tagName.toLowerCase(),
+          url: location.href,
+          pageTitle: document.title,
+          createdAt: new Date().toISOString(),
+          elementRect,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          viewportRect: {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+          },
+        });
+        closeCommentPanel(false);
+      } catch (err) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = prevLabel;
+        const errEl = panelEl.querySelector(".ff-panel-error") || (() => {
+          const el = document.createElement("div");
+          el.className = "ff-panel-error";
+          el.style.cssText = "color:#d23a3a;font-size:12px;margin-top:4px;";
+          panelEl.insertBefore(el, panelEl.querySelector(".ff-panel-actions"));
+          return el;
+        })();
+        errEl.textContent = err?.message || "Erreur lors de l'enregistrement";
+      }
     });
     textarea.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -202,9 +235,79 @@
   }
 
   async function saveItem(data) {
-    const updated = await chrome.runtime.sendMessage({ type: "ADD_ITEM", item: data });
-    items = updated.items || [];
+    if (sessionMeta?.mode === "cloud" && sessionMeta.cloudSessionId && sessionMeta.projectId) {
+      // Cloud mode: capture screenshot, crop to element, POST to API.
+      const viewRect = data.viewportRect;
+      let screenshotBlob = null;
+      let screenshotWidth = null;
+      let screenshotHeight = null;
+      if (viewRect) {
+        try {
+          const { blob, width, height } = await captureAndCrop(viewRect);
+          screenshotBlob = blob;
+          screenshotWidth = width;
+          screenshotHeight = height;
+        } catch (err) {
+          console.warn("feeeeedback: screenshot failed", err);
+        }
+      }
+      const { comment } = await ffCreateComment({
+        sessionId: sessionMeta.cloudSessionId,
+        projectId: sessionMeta.projectId,
+        comment: data.comment,
+        selector: data.selector,
+        tagName: data.tagName,
+        text: data.text,
+        url: data.url,
+        pageTitle: data.pageTitle,
+        viewportWidth: data.viewportWidth,
+        viewportHeight: data.viewportHeight,
+        elementRect: data.elementRect,
+        screenshotBlob,
+        screenshotWidth,
+        screenshotHeight,
+      });
+      // also keep a local copy for immediate widget display
+      const updated = await chrome.runtime.sendMessage({
+        type: "ADD_ITEM",
+        item: { ...data, cloudId: comment?.id, synced: true },
+      });
+      items = updated.items || [];
+    } else {
+      const updated = await chrome.runtime.sendMessage({ type: "ADD_ITEM", item: data });
+      items = updated.items || [];
+    }
     renderWidget();
+  }
+
+  async function captureAndCrop(viewRect) {
+    const res = await chrome.runtime.sendMessage({ type: "FF_CAPTURE_TAB" });
+    if (!res?.dataUrl) throw new Error(res?.error || "capture failed");
+    const img = new Image();
+    img.src = res.dataUrl;
+    await img.decode();
+    const dpr = window.devicePixelRatio || 1;
+    const pad = 24 * dpr;
+    const sx = Math.max(0, Math.round(viewRect.x * dpr) - pad);
+    const sy = Math.max(0, Math.round(viewRect.y * dpr) - pad);
+    const sw = Math.min(img.width - sx, Math.round(viewRect.width * dpr) + pad * 2);
+    const sh = Math.min(img.height - sy, Math.round(viewRect.height * dpr) + pad * 2);
+    const canvas = document.createElement("canvas");
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    // draw element outline for context
+    ctx.strokeStyle = "#ff6b35";
+    ctx.lineWidth = Math.max(2, 2 * dpr);
+    ctx.strokeRect(
+      pad,
+      pad,
+      Math.round(viewRect.width * dpr),
+      Math.round(viewRect.height * dpr)
+    );
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    return { blob, width: sw, height: sh };
   }
 
   // --- widget ----------------------------------------------------------------
@@ -239,12 +342,17 @@
     }
     ensureWidget();
 
+    const modeBadge =
+      sessionMeta?.mode === "cloud" && sessionMeta.projectName
+        ? `<span class="ff-mode-badge" style="background:${sessionMeta.projectColor || "#ff6b35"}">${escapeHtml(sessionMeta.projectName)}</span>`
+        : `<span class="ff-mode-badge ff-mode-local">Local</span>`;
+
     widgetEl.innerHTML = `
       <div class="ff-widget-header" data-ff-drag>
         <div class="ff-widget-title">
           <span class="ff-dot ${pickerActive ? "on" : "idle"}"></span>
           feeeeedback
-          <span class="ff-badge">${items.length}</span>
+          ${modeBadge}
         </div>
         <div class="ff-widget-header-actions">
           <span class="ff-kbd" title="Raccourci sélecteur">${shortcutLabel}</span>
@@ -255,8 +363,9 @@
       </button>
       <div class="ff-widget-list"></div>
       <div class="ff-widget-actions">
-        <button class="ff-btn ff-btn-primary" data-ff-copy ${items.length ? "" : "disabled"}>Copier JSON</button>
-        <button class="ff-btn ff-btn-ghost" data-ff-clear ${items.length ? "" : "disabled"}>Vider</button>
+        ${sessionMeta?.mode === "cloud"
+          ? `<button class="ff-btn ff-btn-ghost" data-ff-clear ${items.length ? "" : "disabled"}>Vider</button>`
+          : `<button class="ff-btn ff-btn-primary" data-ff-copy ${items.length ? "" : "disabled"}>Copier JSON</button><button class="ff-btn ff-btn-ghost" data-ff-clear ${items.length ? "" : "disabled"}>Vider</button>`}
         <button class="ff-btn ff-btn-danger" data-ff-stop>Stop</button>
       </div>
     `;
@@ -295,7 +404,8 @@
     }
 
     widgetEl.querySelector("[data-ff-picker]").onclick = () => setPicker(!pickerActive);
-    widgetEl.querySelector("[data-ff-copy]").onclick = copyToClipboard;
+    const copyBtn = widgetEl.querySelector("[data-ff-copy]");
+    if (copyBtn) copyBtn.onclick = copyToClipboard;
     widgetEl.querySelector("[data-ff-clear]").onclick = async () => {
       if (!confirm("Vider la session en cours ?")) return;
       await chrome.runtime.sendMessage({ type: "CLEAR_ITEMS" });
@@ -394,10 +504,29 @@
       chrome.runtime.sendMessage({ type: "GET_SHORTCUT" }),
     ]);
     items = session?.items || [];
+    sessionMeta = session
+      ? {
+          mode: session.mode || "local",
+          projectId: session.projectId || null,
+          projectName: session.projectName || null,
+          projectColor: session.projectColor || null,
+          cloudSessionId: session.cloudSessionId || null,
+        }
+      : null;
     widgetPos = posRes?.[POS_KEY] || null;
     if (shortcutRes?.shortcut) shortcutLabel = shortcutRes.shortcut;
     document.addEventListener("keydown", onKeyDown, true);
     renderWidget();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[c]));
   }
 
   function deactivateSession() {
