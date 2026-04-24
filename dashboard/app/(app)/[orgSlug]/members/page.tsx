@@ -1,12 +1,35 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import { Loader2, UserPlus, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { Avatar } from "@/components/avatar";
-import { formatDate } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
+import { formatDate, initials } from "@/lib/utils";
 
-type Member = { id: string; role: string; user: { id: string; name: string; email: string; image?: string | null } };
-type Invitation = { id: string; email: string; role: string; status: string; expiresAt: Date | string };
+type Member = {
+  id: string;
+  role: string;
+  user: { id: string; name: string; email: string; image?: string | null };
+};
+type Invitation = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expiresAt: Date | string;
+};
 
 export default function MembersPage({
   params,
@@ -26,7 +49,9 @@ export default function MembersPage({
     if (org.data) {
       setMembers((org.data.members as unknown as Member[]) || []);
       setInvitations(
-        ((org.data.invitations as unknown as Invitation[]) || []).filter((i) => i.status === "pending")
+        ((org.data.invitations as unknown as Invitation[]) || []).filter(
+          (i) => i.status === "pending"
+        )
       );
     }
   }
@@ -40,7 +65,10 @@ export default function MembersPage({
     setLoading(true);
     setError(null);
     try {
-      const { error: err } = await authClient.organization.inviteMember({ email, role: role as "member" | "admin" | "owner" });
+      const { error: err } = await authClient.organization.inviteMember({
+        email,
+        role: role as "member" | "admin" | "owner",
+      });
       if (err) throw new Error(err.message || "Erreur");
       setEmail("");
       await refresh();
@@ -63,91 +91,121 @@ export default function MembersPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-6 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight mb-6">Membres</h1>
+    <div className="px-6 md:px-10 py-8 max-w-4xl mx-auto">
+      <PageHeader
+        title="Membres"
+        description={`${members.length} membre${members.length > 1 ? "s" : ""}${
+          invitations.length > 0
+            ? ` · ${invitations.length} invitation${invitations.length > 1 ? "s" : ""} en attente`
+            : ""
+        }`}
+      />
 
-      <div className="bg-white border border-[color:var(--color-line)] rounded-2xl p-5 mb-6">
-        <h2 className="font-semibold mb-3">Inviter un membre</h2>
+      <Card className="p-5 mt-8">
+        <h2 className="font-medium text-sm mb-3 flex items-center gap-2">
+          <UserPlus className="size-4" />
+          Inviter un membre
+        </h2>
         <form onSubmit={invite} className="flex flex-col sm:flex-row gap-2">
-          <input
+          <Input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="email@exemple.com"
-            className="flex-1 px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm"
+            className="flex-1"
           />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] text-sm bg-white"
-          >
-            <option value="member">Membre</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button
-            type="submit"
-            disabled={loading || !email}
-            className="px-4 py-2.5 rounded-xl bg-[color:var(--color-accent)] hover:bg-[color:var(--color-accent-hover)] text-white text-sm font-medium disabled:opacity-50"
-          >
-            {loading ? "Envoi…" : "Inviter"}
-          </button>
+          <Select value={role} onValueChange={(v) => setRole(v || "member")}>
+            <SelectTrigger className="sm:w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Membre</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button type="submit" disabled={loading || !email}>
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            Inviter
+          </Button>
         </form>
-        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
-      </div>
+        {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+      </Card>
 
       {invitations.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-medium text-[color:var(--color-ink-muted)] uppercase tracking-wider mb-2">
+        <div className="mt-8">
+          <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
             Invitations en attente
           </h2>
-          <div className="bg-white border border-[color:var(--color-line)] rounded-2xl divide-y divide-[color:var(--color-line)]">
-            {invitations.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between px-4 py-3">
+          <Card className="p-0 overflow-hidden">
+            {invitations.map((inv, i) => (
+              <div
+                key={inv.id}
+                className={`flex items-center justify-between px-4 py-3 ${
+                  i !== invitations.length - 1 ? "border-b" : ""
+                }`}
+              >
                 <div>
                   <div className="text-sm font-medium">{inv.email}</div>
-                  <div className="text-xs text-[color:var(--color-ink-muted)]">expire le {formatDate(inv.expiresAt)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    expire le {formatDate(inv.expiresAt)}
+                  </div>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => cancelInvite(inv.id)}
-                  className="text-xs text-[color:var(--color-ink-muted)] hover:text-red-600"
+                  className="text-muted-foreground"
                 >
+                  <X className="size-3" />
                   Annuler
-                </button>
+                </Button>
               </div>
             ))}
-          </div>
+          </Card>
         </div>
       )}
 
-      <div>
-        <h2 className="text-sm font-medium text-[color:var(--color-ink-muted)] uppercase tracking-wider mb-2">
+      <div className="mt-8">
+        <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
           Membres ({members.length})
         </h2>
-        <div className="bg-white border border-[color:var(--color-line)] rounded-2xl divide-y divide-[color:var(--color-line)]">
-          {members.map((m) => (
-            <div key={m.id} className="flex items-center justify-between px-4 py-3">
+        <Card className="p-0 overflow-hidden">
+          {members.map((m, i) => (
+            <div
+              key={m.id}
+              className={`flex items-center justify-between px-4 py-3 ${
+                i !== members.length - 1 ? "border-b" : ""
+              }`}
+            >
               <div className="flex items-center gap-3">
-                <Avatar name={m.user.name} email={m.user.email} image={m.user.image} size={32} />
+                <Avatar className="size-8">
+                  <AvatarImage src={m.user.image || undefined} alt={m.user.name} />
+                  <AvatarFallback>{initials(m.user.name, m.user.email)}</AvatarFallback>
+                </Avatar>
                 <div>
                   <div className="text-sm font-medium">{m.user.name}</div>
-                  <div className="text-xs text-[color:var(--color-ink-muted)]">{m.user.email}</div>
+                  <div className="text-xs text-muted-foreground">{m.user.email}</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-[color:var(--color-ink-muted)] capitalize">{m.role}</span>
+                <Badge variant="outline" className="capitalize">
+                  {m.role}
+                </Badge>
                 {m.role !== "owner" && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => removeMember(m.id)}
-                    className="text-xs text-[color:var(--color-ink-muted)] hover:text-red-600"
+                    className="text-muted-foreground"
                   >
                     Retirer
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
           ))}
-        </div>
+        </Card>
       </div>
     </div>
   );

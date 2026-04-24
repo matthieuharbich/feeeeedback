@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Mail, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function LoginForm() {
   const router = useRouter();
@@ -48,78 +52,93 @@ function LoginForm() {
   if (sent) {
     return (
       <div className="text-center">
-        <div className="w-12 h-12 mx-auto rounded-full bg-[color:var(--color-accent)]/10 flex items-center justify-center mb-6">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[color:var(--color-accent)]">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-            <polyline points="22,6 12,13 2,6" />
-          </svg>
+        <div className="w-12 h-12 mx-auto rounded-full bg-brand/10 flex items-center justify-center mb-6 text-brand">
+          <Mail className="size-5" />
         </div>
-        <h1 className="text-xl font-semibold tracking-tight mb-2">Vérifie ta boîte mail</h1>
-        <p className="text-sm text-[color:var(--color-ink-muted)]">
+        <h1 className="text-xl font-semibold tracking-tight mb-2">
+          Vérifie ta boîte mail
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Lien envoyé à <strong>{email}</strong>. Il expire dans 5 min.
         </p>
-        <button
+        <Button
+          variant="link"
+          className="mt-6 text-muted-foreground"
           onClick={() => {
             setSent(false);
             setEmail("");
           }}
-          className="mt-6 text-sm text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] underline"
         >
           Utiliser un autre email
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-center mb-1">Se connecter</h1>
-      <p className="text-sm text-[color:var(--color-ink-muted)] text-center mb-8">
-        {mode === "password" ? "Email + mot de passe." : "On t'envoie un lien magique pour te connecter."}
+      <h1 className="text-2xl font-semibold tracking-tight text-center mb-1">
+        Se connecter
+      </h1>
+      <p className="text-sm text-muted-foreground text-center mb-8">
+        {mode === "password"
+          ? "Email + mot de passe."
+          : "On t'envoie un lien magique pour te connecter."}
       </p>
 
       <form onSubmit={onSubmit} className="space-y-3">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="toi@exemple.com"
-          className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm"
-          autoFocus
-        />
-        {mode === "password" && (
-          <input
-            type="password"
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="sr-only">Email</Label>
+          <Input
+            id="email"
+            type="email"
             required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Mot de passe"
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="toi@exemple.com"
+            autoFocus
           />
+        </div>
+        {mode === "password" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="password" className="sr-only">Mot de passe</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mot de passe"
+            />
+          </div>
         )}
-        <button
+        <Button
           type="submit"
           disabled={loading || !email || (mode === "password" && !password)}
-          className="w-full px-3.5 py-2.5 rounded-xl bg-[color:var(--color-accent)] hover:bg-[color:var(--color-accent-hover)] text-white text-sm font-medium disabled:opacity-50 transition-colors"
+          className="w-full"
         >
-          {loading ? "…" : mode === "password" ? "Se connecter" : "M'envoyer le lien"}
-        </button>
-        {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+          {loading && <Loader2 className="size-4 animate-spin" />}
+          {mode === "password" ? "Se connecter" : "M'envoyer le lien"}
+        </Button>
+        {error && <p className="text-sm text-destructive text-center">{error}</p>}
       </form>
 
       <div className="mt-6 text-center">
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           onClick={() => {
             setMode(mode === "password" ? "magic" : "password");
             setError(null);
             setPassword("");
           }}
-          className="text-xs text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] underline"
+          className="text-muted-foreground"
         >
-          {mode === "password" ? "Utiliser un lien magique à la place" : "J'ai un mot de passe"}
-        </button>
+          {mode === "password"
+            ? "Utiliser un lien magique à la place"
+            : "J'ai un mot de passe"}
+        </Button>
       </div>
     </>
   );
@@ -127,13 +146,19 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-muted/30">
       <Link href="/" className="flex items-center gap-2 mb-10">
-        <span className="w-2.5 h-2.5 rounded-full bg-[color:var(--color-accent)]" />
+        <span className="w-2 h-2 rounded-full bg-[color:var(--brand)]" />
         <span className="font-semibold tracking-tight">feeeeedback</span>
       </Link>
-      <div className="w-full max-w-sm">
-        <Suspense fallback={<div className="text-center text-sm text-[color:var(--color-ink-muted)]">Chargement…</div>}>
+      <div className="w-full max-w-sm bg-card border rounded-xl p-8 shadow-sm">
+        <Suspense
+          fallback={
+            <div className="text-center text-sm text-muted-foreground">
+              Chargement…
+            </div>
+          }
+        >
           <LoginForm />
         </Suspense>
       </div>

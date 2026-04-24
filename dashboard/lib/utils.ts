@@ -1,4 +1,4 @@
-import { type ClassValue, clsx } from "clsx";
+import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -41,6 +41,16 @@ export function dayKey(d: Date | string): string {
   return date.toISOString().slice(0, 10);
 }
 
+export function initials(name: string | null | undefined, email?: string | null) {
+  const source = name || email || "?";
+  return source
+    .split(/[\s@.]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("");
+}
+
 export function contributorColor(seed: string) {
   const palette = [
     { bg: "#fef3c7", fg: "#92400e" },
@@ -55,14 +65,4 @@ export function contributorColor(seed: string) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
   return palette[Math.abs(h) % palette.length];
-}
-
-export function initials(name: string | null | undefined, email?: string | null) {
-  const source = name || email || "?";
-  return source
-    .split(/[\s@.]/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase())
-    .join("");
 }

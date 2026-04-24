@@ -2,8 +2,12 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { comment, feedbackSession, project, user } from "@/lib/db/schema";
+import Link from "next/link";
 import { requireSession, getOrgBySlug } from "@/lib/server/session";
-import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Inbox } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 import { InboxClient } from "./inbox-client";
 
 export default async function InboxPage({
@@ -24,13 +28,20 @@ export default async function InboxPage({
 
   if (!projects.length) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight mb-8">Inbox</h1>
-        <EmptyState
-          title="Aucun projet"
-          description="Crée un projet pour commencer à capturer des retours depuis l'extension."
-          action={{ label: "Créer un projet", href: `/${orgSlug}/projects/new` }}
-        />
+      <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
+        <PageHeader title="Inbox" description="Aucun retour pour l'instant" />
+        <Card className="p-16 text-center mt-8">
+          <div className="size-12 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+            <Inbox className="size-5" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">Aucun projet</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
+            Crée un projet pour commencer à capturer des retours depuis l'extension.
+          </p>
+          <Button asChild>
+            <Link href={`/${orgSlug}/projects/new`}>Créer un projet</Link>
+          </Button>
+        </Card>
       </div>
     );
   }

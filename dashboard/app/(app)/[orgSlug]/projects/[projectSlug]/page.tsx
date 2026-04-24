@@ -1,12 +1,15 @@
 import Link from "next/link";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { comment, feedbackSession, project, user } from "@/lib/db/schema";
-import { sql } from "drizzle-orm";
 import { requireSession, getOrgBySlug } from "@/lib/server/session";
-import { Avatar } from "@/components/avatar";
-import { EmptyState } from "@/components/empty-state";
-import { formatDate, shortUrl } from "@/lib/utils";
+import { ArrowLeft, Inbox } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
+import { ContributorAvatar } from "@/components/contributor-avatar";
+import { shortUrl, timeAgo } from "@/lib/utils";
 
 export default async function ProjectPage({
   params,
@@ -23,94 +26,121 @@ export default async function ProjectPage({
     .from(project)
     .where(and(eq(project.organizationId, org.id), eq(project.slug, projectSlug)))
     .limit(1);
-  if (!proj[0]) return <div className="p-10">Projet introuvable.</div>;
+  if (!proj[0])
+    return (
+      <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
+        Projet introuvable.
+      </div>
+    );
 
   const rows = await db
     .select({
       id: comment.id,
       comment: comment.comment,
-      selector: comment.selector,
       url: comment.url,
       screenshotPath: comment.screenshotPath,
       createdAt: comment.createdAt,
       contributorName: sql<string | null>`COALESCE(${feedbackSession.contributorName}, ${user.name})`,
-      authorName: user.name,
-      authorEmail: user.email,
-      authorImage: user.image,
     })
     .from(comment)
     .innerJoin(user, eq(comment.authorId, user.id))
     .leftJoin(feedbackSession, eq(comment.sessionId, feedbackSession.id))
     .where(eq(comment.projectId, proj[0].id))
     .orderBy(desc(comment.createdAt))
-    .limit(100);
+    .limit(200);
 
   const patterns = (proj[0].urlPatterns as string[]) || [];
+  const color = proj[0].color;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
-      <Link
-        href={`/${orgSlug}/projects`}
-        className="text-sm text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] mb-4 inline-block"
-      >
-        ← Projets
-      </Link>
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <span className="w-4 h-4 rounded-full" style={{ background: proj[0].color }} />
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{proj[0].name}</h1>
-            {patterns.length > 0 && (
-              <div className="text-xs text-[color:var(--color-ink-muted)] font-mono mt-1">
-                {patterns.join(" · ")}
-              </div>
-            )}
-          </div>
-        </div>
-        <Link
-          href={`/${orgSlug}/projects/${projectSlug}/settings`}
-          className="text-sm text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
-        >
-          Réglages
+    <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
+      <Button asChild variant="ghost" size="sm" className="mb-4 -ml-3">
+        <Link href={`/${orgSlug}/projects`}>
+          <ArrowLeft className="size-4" /> Projets
         </Link>
-      </div>
+      </Button>
+
+      <PageHeader
+        title={proj[0].name}
+        description={
+          patterns.length > 0 ? (
+            <span className="font-mono">{patterns.join(" · ")}</span>
+          ) : (
+            <span className="text-muted-foreground italic">
+              Aucun pattern d'URL
+            </span>
+          )
+        }
+        actions={
+          <Badge
+            variant="outline"
+            className="gap-1.5"
+            style={{ background: `${color}1a`, color, borderColor: `${color}33` }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+            {rows.length} retour{rows.length > 1 ? "s" : ""}
+          </Badge>
+        }
+      />
 
       {rows.length === 0 ? (
-        <EmptyState
-          title="Aucun retour"
-          description="Lance une session dans l'extension sur une page qui matche ce projet."
-        />
+        <Card className="p-16 text-center mt-8">
+          <div className="size-12 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+            <Inbox className="size-5" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">Aucun retour</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            Lance une session dans l'extension sur une page qui matche ce projet.
+          </p>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-8">
           {rows.map((r) => (
-            <article key={r.id} className="bg-white border border-[color:var(--color-line)] rounded-2xl overflow-hidden">
-              <div className="aspect-[4/3] bg-[color:var(--color-surface-2)]">
-                {r.screenshotPath ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`/api/v1/uploads/${r.screenshotPath}`} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-[color:var(--color-ink-muted)]">(pas de capture)</div>
-                )}
-              </div>
-              <div className="p-4">
-                <p className="text-sm leading-relaxed line-clamp-3">{r.comment}</p>
-                <div className="mt-3 text-xs text-[color:var(--color-ink-muted)] truncate">{shortUrl(r.url)}</div>
-                <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Avatar
-                      name={r.contributorName || r.authorName}
-                      email={r.authorEmail}
-                      image={r.authorImage}
-                      size={20}
+            <Link
+              key={r.id}
+              href={`/${orgSlug}/inbox?q=${encodeURIComponent(r.comment.slice(0, 30))}`}
+              className="group"
+            >
+              <Card className="overflow-hidden hover:shadow-md hover:border-foreground/10 transition-all p-0 gap-0">
+                <div
+                  className="h-44 border-b"
+                  style={{
+                    background:
+                      "repeating-conic-gradient(color-mix(in srgb, var(--muted) 90%, transparent) 0% 25%, var(--muted) 0% 50%) 50% / 12px 12px",
+                  }}
+                >
+                  {r.screenshotPath ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/v1/uploads/${r.screenshotPath}`}
+                      alt=""
+                      className="w-full h-full object-contain"
                     />
-                    <span className="text-xs text-[color:var(--color-ink-muted)] truncate">
-                      {r.contributorName || r.authorName}
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                      Pas de capture
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-4">
+                  <p className="text-sm leading-relaxed line-clamp-3">{r.comment}</p>
+                  <div className="mt-3 text-xs text-muted-foreground truncate">
+                    {shortUrl(r.url)}
+                  </div>
+                  <div className="mt-3 pt-3 border-t flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <ContributorAvatar name={r.contributorName} size={20} />
+                      <span className="text-xs truncate">
+                        {r.contributorName || "—"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {timeAgo(r.createdAt)}
                     </span>
                   </div>
-                  <span className="text-xs text-[color:var(--color-ink-muted)]">{formatDate(r.createdAt)}</span>
-                </div>
-              </div>
-            </article>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

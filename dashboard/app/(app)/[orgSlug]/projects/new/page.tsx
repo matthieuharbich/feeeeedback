@@ -3,6 +3,13 @@
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
 
 function slugify(s: string) {
   return s
@@ -59,95 +66,92 @@ export default function NewProjectPage({
   }
 
   return (
-    <div className="max-w-lg mx-auto px-6 py-10">
-      <Link
-        href={`/${orgSlug}/projects`}
-        className="text-sm text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] mb-4 inline-block"
-      >
-        ← Projets
-      </Link>
-      <h1 className="text-2xl font-semibold tracking-tight mb-1">Nouveau projet</h1>
-      <p className="text-sm text-[color:var(--color-ink-muted)] mb-8">
-        Rattache un projet à une ou plusieurs URL. L'extension pré-sélectionnera ce projet quand tu visites une page qui matche.
-      </p>
+    <div className="px-6 md:px-10 py-8 max-w-2xl mx-auto">
+      <Button asChild variant="ghost" size="sm" className="mb-4 -ml-3">
+        <Link href={`/${orgSlug}/projects`}>
+          <ArrowLeft className="size-4" /> Projets
+        </Link>
+      </Button>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <Field label="Nom">
-          <input
-            type="text"
-            required
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              if (!slugTouched) setSlug(slugify(e.target.value));
-            }}
-            placeholder="Mon site"
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm"
-            autoFocus
-          />
-        </Field>
-        <Field label="Slug">
-          <input
-            type="text"
-            required
-            value={slug}
-            onChange={(e) => {
-              setSlugTouched(true);
-              setSlug(slugify(e.target.value));
-            }}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm font-mono"
-          />
-        </Field>
-        <Field
-          label="URL patterns"
-          hint="Une par ligne. * = tout sauf /, ** = tout. Ex: *.mtth.world/** ou example.com/*"
-        >
-          <textarea
-            value={patterns}
-            onChange={(e) => setPatterns(e.target.value)}
-            placeholder="*.exemple.com/**"
-            rows={4}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm font-mono"
-          />
-        </Field>
-        <Field label="Couleur">
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-10 h-10 rounded-lg border border-[color:var(--color-line)] cursor-pointer"
-            />
-            <input
-              type="text"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="flex-1 px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm font-mono"
+      <PageHeader
+        title="Nouveau projet"
+        description="Rattache un projet à une ou plusieurs URL. L'extension pré-sélectionnera ce projet quand tu visites une page qui matche."
+      />
+
+      <Card className="p-6 mt-8">
+        <form onSubmit={onSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nom</Label>
+            <Input
+              id="name"
+              required
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (!slugTouched) setSlug(slugify(e.target.value));
+              }}
+              placeholder="Mon site"
+              autoFocus
             />
           </div>
-        </Field>
 
-        <div className="flex items-center gap-2 pt-2">
-          <button
-            type="submit"
-            disabled={loading || !name}
-            className="flex-1 px-3.5 py-2.5 rounded-xl bg-[color:var(--color-accent)] hover:bg-[color:var(--color-accent-hover)] text-white text-sm font-medium disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Création…" : "Créer le projet"}
-          </button>
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </form>
-    </div>
-  );
-}
+          <div className="space-y-2">
+            <Label htmlFor="slug">Slug</Label>
+            <Input
+              id="slug"
+              required
+              value={slug}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setSlug(slugify(e.target.value));
+              }}
+              className="font-mono"
+            />
+          </div>
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium mb-1.5">{label}</label>
-      {children}
-      {hint && <p className="text-xs text-[color:var(--color-ink-muted)] mt-1">{hint}</p>}
+          <div className="space-y-2">
+            <Label htmlFor="patterns">URL patterns</Label>
+            <Textarea
+              id="patterns"
+              value={patterns}
+              onChange={(e) => setPatterns(e.target.value)}
+              placeholder="*.exemple.com/**"
+              rows={4}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Une par ligne. <code>*</code> = tout sauf /, <code>**</code> = tout. Ex :{" "}
+              <code>*.mtth.world/**</code>
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="color">Couleur</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="color"
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-14 h-9 p-1 cursor-pointer"
+              />
+              <Input
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="flex-1 font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2">
+            <Button type="submit" disabled={loading || !name} className="flex-1">
+              {loading && <Loader2 className="size-4 animate-spin" />}
+              Créer le projet
+            </Button>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </form>
+      </Card>
     </div>
   );
 }

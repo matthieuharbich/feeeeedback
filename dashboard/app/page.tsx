@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowRight, Puzzle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getSession, getUserOrgs } from "@/lib/server/session";
 
 export default async function Home() {
@@ -11,62 +13,67 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-8 py-6">
-        <Logo />
-        <Link
-          href="/login"
-          className="text-sm font-medium text-[color:var(--color-ink)] hover:text-[color:var(--color-accent)] transition-colors"
-        >
-          Se connecter
-        </Link>
+    <div className="min-h-screen flex flex-col">
+      <header className="px-6 md:px-10 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[color:var(--brand)]" />
+          <span className="font-semibold tracking-tight">feeeeedback</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/install">
+              <Puzzle className="size-4" />
+              Extension
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/login">Se connecter</Link>
+          </Button>
+        </div>
       </header>
 
-      <section className="flex-1 flex items-center px-8">
+      <main className="flex-1 flex items-center px-6 md:px-10">
         <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--brand)]" />
+            Extension Chrome · multi-projet · team
+          </div>
           <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
             Le feedback visuel, <br />
-            <span className="text-[color:var(--color-accent)]">simple</span>.
+            <span className="text-[color:var(--brand)]">simple</span>.
           </h1>
-          <p className="mt-6 text-lg text-[color:var(--color-ink-muted)] leading-relaxed">
-            Pointe un élément d'une page live, ajoute un commentaire, partage avec ton équipe.
-            <br />
-            Tout revient dans un dashboard unique, par projet, par personne, avec capture d'écran.
+          <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
+            Pointe un élément d'une page live, ajoute un commentaire, partage
+            avec ton équipe. Tout revient dans un dashboard unique, par projet,
+            par personne, avec capture d'écran.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-3">
-            <Link
-              href="/login"
-              className="bg-[color:var(--color-accent)] hover:bg-[color:var(--color-accent-hover)] text-white px-6 py-3 rounded-xl font-medium text-sm transition-colors"
-            >
-              Commencer
-            </Link>
-            <Link
-              href="/install"
-              className="px-6 py-3 rounded-xl font-medium text-sm text-[color:var(--color-ink)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-            >
-              Installer l'extension →
-            </Link>
+          <div className="mt-10 flex items-center justify-center gap-3 flex-wrap">
+            <Button asChild size="lg">
+              <Link href="/login">
+                Commencer <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/install">Installer l'extension</Link>
+            </Button>
           </div>
         </div>
-      </section>
+      </main>
 
-      <footer className="px-8 py-6 text-xs text-[color:var(--color-ink-muted)] flex justify-between">
+      <footer className="px-6 md:px-10 py-6 text-xs text-muted-foreground flex justify-between">
         <span>feeeeedback</span>
-        <span>
-          <a href="https://github.com/matthieuharbich/feeeeedback" className="hover:text-[color:var(--color-ink)]">
+        <div className="flex gap-4">
+          <a
+            href="https://github.com/matthieuharbich/feeeeedback"
+            className="hover:text-foreground"
+          >
             GitHub
           </a>
-        </span>
+          <Link href="/privacy" className="hover:text-foreground">
+            Confidentialité
+          </Link>
+        </div>
       </footer>
-    </main>
-  );
-}
-
-function Logo() {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-2.5 h-2.5 rounded-full bg-[color:var(--color-accent)]" />
-      <span className="font-semibold tracking-tight">feeeeedback</span>
     </div>
   );
 }
