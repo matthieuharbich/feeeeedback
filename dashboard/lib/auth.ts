@@ -4,7 +4,9 @@ import { magicLink, organization } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "./db";
 import * as schema from "./db/schema";
-import { sendMagicLink } from "./mail";
+import { sendMagicLink, sendInvitation } from "./mail";
+
+const appUrl = process.env.BETTER_AUTH_URL || "http://localhost:3000";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -19,16 +21,8 @@ export const auth = betterAuth({
       invitation: schema.invitation,
     },
   }),
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  baseURL: appUrl,
   secret: process.env.BETTER_AUTH_SECRET,
-  emailAndPassword: {
-    enabled: true,
-    requireEmailVerification: false,
-    minPasswordLength: 8,
-  },
-  user: {
-    changeEmail: { enabled: true },
-  },
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
@@ -37,6 +31,15 @@ export const auth = betterAuth({
     }),
     organization({
       allowUserToCreateOrganization: true,
+      async sendInvitationEmail(data) {
+        const url = `${appUrl}/accept-invite?id=${data.id}&email=${encodeURIComponent(data.email)}`;
+        await sendInvitation(
+          data.email,
+          url,
+          data.organization.name,
+          data.inviter.user.name || data.inviter.user.email
+        );
+      },
     }),
     nextCookies(),
   ],

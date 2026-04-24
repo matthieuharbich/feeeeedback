@@ -1,12 +1,20 @@
-// feeeeedback — popup logic (auth, project selection, session control)
+// feeeeedback — popup (simplified auth flow)
+
+const API_BASE = "https://feeeeedback.mtth.world";
 
 const $ = (id) => document.getElementById(id);
 
 const els = {
   status: $("status"),
   authNone: $("authNone"),
+  authSent: $("authSent"),
   authLoaded: $("authLoaded"),
-  loginBtn: $("loginBtn"),
+  magicForm: $("magicForm"),
+  emailInput: $("emailInput"),
+  magicBtn: $("magicBtn"),
+  magicErr: $("magicErr"),
+  sentEmail: $("sentEmail"),
+  backBtn: $("backBtn"),
   localStartBtn: $("localStartBtn"),
   signOutBtn: $("signOutBtn"),
   userAvatar: $("userAvatar"),
@@ -30,6 +38,7 @@ let session = null;
 let currentTab = null;
 let matchedProjects = [];
 let allProjects = [];
+let pendingEmail = null;
 
 async function init() {
   auth = await ffGetAuth();
@@ -46,6 +55,23 @@ async function init() {
     }
   }
   render();
+  listenForAuth();
+}
+
+// Live-update when bridge.js stores new auth
+function listenForAuth() {
+  chrome.storage.onChanged.addListener(async (changes, area) => {
+    if (area !== "local" || !changes.ff_auth) return;
+    auth = changes.ff_auth.newValue || null;
+    if (auth && currentTab?.url) {
+      try {
+        const r = await ffMatchProjects(currentTab.url);
+        matchedProjects = r.matches || [];
+        allProjects = r.all || [];
+      } catch {}
+    }
+    render();
+  });
 }
 
 function render() {
@@ -53,20 +79,22 @@ function render() {
   els.status.textContent = active ? "actif" : "inactif";
   els.status.className = `status ${active ? "status-on" : "status-off"}`;
 
-  // Auth UI
-  els.authNone.hidden = !!auth || active;
+  els.authNone.hidden = !!auth || active || !!pendingEmail;
+  els.authSent.hidden = !!auth || active || !pendingEmail;
   els.authLoaded.hidden = !auth || active;
 
   if (auth) {
     els.userName.textContent = auth.user?.name || auth.user?.email || "";
     els.userEmail.textContent = auth.user?.email || "";
-    els.userAvatar.textContent = (auth.user?.name || auth.user?.email || "?").slice(0, 2).toUpperCase();
+    els.userAvatar.textContent = (auth.user?.name || auth.user?.email || "?")
+      .slice(0, 2)
+      .toUpperCase();
 
     els.tabUrl.textContent = currentTab?.url ? ffShortUrl(currentTab.url) : "—";
 
-    // Populate project dropdown (matched first, then others)
     const select = els.projectSelect;
     select.innerHTML = "";
+
     const optNone = document.createElement("option");
     optNone.value = "";
     optNone.textContent = "— Local (pas de sync) —";
@@ -86,17 +114,14 @@ function render() {
       select.appendChild(group);
     }
 
-    // auto-select first match
     if (matchedProjects.length) select.value = matchedProjects[0].id;
   }
 
-  // Session UI
-  els.sessionActions.hidden = active;
+  els.sessionActions.hidden = !auth || !!pendingEmail;
   els.meta.hidden = !active;
   els.extraActions.hidden = !active;
 
   if (auth && !active) {
-    els.sessionActions.hidden = false;
     els.toggleBtn.textContent = "Démarrer une session";
     els.toggleBtn.classList.add("btn-primary");
     els.toggleBtn.classList.remove("btn-danger");
@@ -112,24 +137,57 @@ function render() {
     els.projectLabel.textContent = session?.projectName || "Local";
     els.dashBtn.hidden = !(session?.mode === "cloud" && auth?.apiUrl);
   }
+
+  if (pendingEmail) els.sentEmail.textContent = pendingEmail;
 }
 
 function projectOption(p) {
   const opt = document.createElement("option");
   opt.value = p.id;
   opt.textContent = p.name;
-  opt.dataset.name = p.name;
-  opt.dataset.color = p.color;
   return opt;
+}
+
+function showErr(msg) {
+  els.magicErr.textContent = msg;
+  els.magicErr.hidden = !msg;
 }
 
 // --- handlers --------------------------------------------------------------
 
-els.loginBtn?.addEventListener("click", async () => {
-  // Default to production dashboard; dev can edit chrome.storage.local directly
-  const url = "https://feeeeedback.mtth.world/extension/link";
-  await chrome.tabs.create({ url });
-  window.close();
+els.magicForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = els.emailInput.value.trim();
+  if (!email) return;
+  showErr("");
+  els.magicBtn.disabled = true;
+  els.magicBtn.textContent = "Envoi…";
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/sign-in/magic-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        callbackURL: "/extension/auto-connect",
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      throw new Error(data.error?.message || data.message || "Impossible d'envoyer le lien");
+    }
+    pendingEmail = email;
+    render();
+  } catch (err) {
+    showErr(err.message || "Erreur");
+  } finally {
+    els.magicBtn.disabled = false;
+    els.magicBtn.textContent = "M'envoyer le lien";
+  }
+});
+
+els.backBtn?.addEventListener("click", () => {
+  pendingEmail = null;
+  render();
 });
 
 els.localStartBtn?.addEventListener("click", async () => {
@@ -192,7 +250,7 @@ els.copyBtn?.addEventListener("click", async () => {
 els.dashBtn?.addEventListener("click", async () => {
   if (!auth?.apiUrl) return;
   const slug = auth.orgs?.[0]?.slug;
-  const url = slug ? `${auth.apiUrl}/${slug}/inbox` : `${auth.apiUrl}/app`;
+  const url = slug ? `${auth.apiUrl}/${slug}/inbox` : `${auth.apiUrl}/`;
   await chrome.tabs.create({ url });
 });
 

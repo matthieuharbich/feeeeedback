@@ -11,36 +11,57 @@
       <span id="status" class="status status-off">inactif</span>
     </header>
 
-    <!-- Auth states -->
-    <section id="authSection">
-      <div id="authNone" hidden>
-        <p class="hint">
-          Connecte l'extension à ton compte pour retrouver tes retours dans le dashboard.
+    <!-- Auth: not logged in -->
+    <section id="authNone" hidden>
+      <p class="hint">
+        Entre ton email pour recevoir un lien de connexion. Ton feedback sera attribué à ton identité.
+      </p>
+      <form id="magicForm">
+        <input
+          id="emailInput"
+          type="email"
+          required
+          placeholder="toi@exemple.com"
+          class="input"
+        />
+        <button id="magicBtn" type="submit" class="btn btn-primary">M'envoyer le lien</button>
+      </form>
+      <div id="magicErr" class="err" hidden></div>
+      <div class="or">ou</div>
+      <button id="localStartBtn" class="btn btn-ghost">Utiliser en mode local</button>
+    </section>
+
+    <!-- Auth: magic link sent -->
+    <section id="authSent" hidden>
+      <div class="sent-card">
+        <div class="sent-icon">✓</div>
+        <h2 class="sent-title">Vérifie ta boîte mail</h2>
+        <p class="sent-text">
+          Clique le lien reçu sur <strong id="sentEmail"></strong>. L'extension se connectera automatiquement.
         </p>
-        <button id="loginBtn" class="btn btn-primary">Se connecter</button>
-        <div class="or">ou</div>
-        <button id="localStartBtn" class="btn btn-ghost">Utiliser en mode local</button>
+      </div>
+      <button id="backBtn" class="btn btn-ghost">Utiliser un autre email</button>
+    </section>
+
+    <!-- Auth: logged in -->
+    <section id="authLoaded" hidden>
+      <div class="user-row">
+        <div class="user-avatar" id="userAvatar">—</div>
+        <div class="user-info">
+          <div class="user-name" id="userName"></div>
+          <div class="user-email" id="userEmail"></div>
+        </div>
+        <button id="signOutBtn" class="icon-btn" title="Se déconnecter">×</button>
       </div>
 
-      <div id="authLoaded" hidden>
-        <div class="user-row">
-          <div class="user-avatar" id="userAvatar">—</div>
-          <div class="user-info">
-            <div class="user-name" id="userName"></div>
-            <div class="user-email" id="userEmail"></div>
-          </div>
-          <button id="signOutBtn" class="icon-btn" title="Se déconnecter">×</button>
-        </div>
+      <div class="field">
+        <label>Projet</label>
+        <select id="projectSelect" class="select"></select>
+      </div>
 
-        <div class="field">
-          <label>Projet</label>
-          <select id="projectSelect" class="select"></select>
-        </div>
-
-        <div class="page-url">
-          <span>Page :</span>
-          <span id="tabUrl">—</span>
-        </div>
+      <div class="page-url">
+        <span>Page :</span>
+        <span id="tabUrl">—</span>
       </div>
     </section>
 
