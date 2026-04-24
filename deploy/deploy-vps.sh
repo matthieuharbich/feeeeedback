@@ -56,10 +56,10 @@ echo "=== 3/7 create feeeeedback database if missing ==="
 ssh -i "$VPS_KEY" "$VPS_HOST" bash <<'REMOTE'
 set -euo pipefail
 POSTGRES_USER=$(grep '^POSTGRES_USER=' /home/ubuntu/mtth-stack/.env | cut -d= -f2-)
-if docker exec mtth-postgres psql -U "$POSTGRES_USER" -lqt | cut -d\| -f1 | grep -qw feeeeedback; then
+if docker exec mtth-postgres psql -U "$POSTGRES_USER" -d postgres -lqt | cut -d\| -f1 | grep -qw feeeeedback; then
   echo "  → database 'feeeeedback' already exists"
 else
-  docker exec mtth-postgres psql -U "$POSTGRES_USER" -c "CREATE DATABASE feeeeedback;"
+  docker exec mtth-postgres psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE feeeeedback;"
   echo "  → database 'feeeeedback' created"
 fi
 REMOTE
