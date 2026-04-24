@@ -11,54 +11,28 @@
       <span id="status" class="status status-off">inactif</span>
     </header>
 
-    <!-- Auth: not logged in -->
+    <!-- Auth: locked -->
     <section id="authNone" hidden>
-      <p class="hint">
-        Entre ton email pour recevoir un lien de connexion. Ton feedback sera attribué à ton identité.
-      </p>
-      <form id="magicForm">
+      <p class="hint">Entre le mot de passe pour débloquer l'extension.</p>
+      <form id="unlockForm">
         <input
-          id="emailInput"
-          type="email"
+          id="passwordInput"
+          type="password"
           required
-          placeholder="toi@exemple.com"
+          autocomplete="current-password"
+          placeholder="Mot de passe"
           class="input"
+          autofocus
         />
-        <button id="magicBtn" type="submit" class="btn btn-primary">M'envoyer le lien</button>
+        <button id="unlockBtn" type="submit" class="btn btn-primary">Déverrouiller</button>
       </form>
-      <div id="magicErr" class="err" hidden></div>
+      <div id="unlockErr" class="err" hidden></div>
       <div class="or">ou</div>
       <button id="localStartBtn" class="btn btn-ghost">Utiliser en mode local</button>
     </section>
 
-    <!-- Auth: magic link sent -->
-    <section id="authSent" hidden>
-      <div class="sent-card">
-        <div class="sent-icon">✓</div>
-        <h2 class="sent-title">Vérifie ta boîte mail</h2>
-        <p class="sent-text">
-          Clique le lien reçu sur <strong id="sentEmail"></strong>. L'extension se connectera automatiquement.
-        </p>
-      </div>
-      <button id="backBtn" class="btn btn-ghost">Utiliser un autre email</button>
-    </section>
-
-    <!-- Auth: logged in -->
+    <!-- Auth: unlocked -->
     <section id="authLoaded" hidden>
-      <div class="user-row">
-        <div class="user-avatar" id="userAvatar">—</div>
-        <div class="user-info">
-          <div class="user-name" id="userName"></div>
-          <div class="user-email" id="userEmail"></div>
-        </div>
-        <button id="signOutBtn" class="icon-btn" title="Se déconnecter">×</button>
-      </div>
-
-      <div class="field">
-        <label>Projet</label>
-        <select id="projectSelect" class="select"></select>
-      </div>
-
       <div class="field">
         <label>Qui donne le feedback ?</label>
         <select id="contributorSelect" class="select">
@@ -77,10 +51,17 @@
         />
       </div>
 
+      <div class="field">
+        <label>Projet</label>
+        <select id="projectSelect" class="select"></select>
+      </div>
+
       <div class="page-url">
         <span>Page :</span>
         <span id="tabUrl">—</span>
       </div>
+
+      <button id="lockBtn" class="btn btn-ghost" style="margin-top: 8px;">Verrouiller</button>
     </section>
 
     <section id="sessionActions" hidden>

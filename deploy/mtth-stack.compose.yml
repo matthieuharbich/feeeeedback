@@ -22,6 +22,8 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-feeeeedback <noreply@feeeeedback.mtth.world>}
       UPLOADS_DIR: /app/uploads
+      EXTENSION_PASSWORD: ${EXTENSION_PASSWORD:-apolo}
+      EXTENSION_BEARER_TOKEN: ${EXTENSION_BEARER_TOKEN}
     volumes:
       - feeeeedback_uploads:/app/uploads
     networks:

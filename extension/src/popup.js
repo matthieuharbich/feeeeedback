@@ -1,4 +1,4 @@
-// feeeeedback — popup (simplified auth + project + contributor)
+// feeeeedback — popup (shared password unlock + contributor selector)
 
 const API_BASE = "https://feeeeedback.mtth.world";
 const CONTRIB_KEY = "ff_contributor";
@@ -9,19 +9,13 @@ const $ = (id) => document.getElementById(id);
 const els = {
   status: $("status"),
   authNone: $("authNone"),
-  authSent: $("authSent"),
   authLoaded: $("authLoaded"),
-  magicForm: $("magicForm"),
-  emailInput: $("emailInput"),
-  magicBtn: $("magicBtn"),
-  magicErr: $("magicErr"),
-  sentEmail: $("sentEmail"),
-  backBtn: $("backBtn"),
+  unlockForm: $("unlockForm"),
+  passwordInput: $("passwordInput"),
+  unlockBtn: $("unlockBtn"),
+  unlockErr: $("unlockErr"),
   localStartBtn: $("localStartBtn"),
-  signOutBtn: $("signOutBtn"),
-  userAvatar: $("userAvatar"),
-  userName: $("userName"),
-  userEmail: $("userEmail"),
+  lockBtn: $("lockBtn"),
   tabUrl: $("tabUrl"),
   projectSelect: $("projectSelect"),
   contributorSelect: $("contributorSelect"),
@@ -43,8 +37,7 @@ let session = null;
 let currentTab = null;
 let matchedProjects = [];
 let allProjects = [];
-let pendingEmail = null;
-let savedContributor = null; // { kind: "preset" | "custom", value: "Nicolas" }
+let savedContributor = null;
 
 async function init() {
   auth = await ffGetAuth();
@@ -53,17 +46,23 @@ async function init() {
   savedContributor = await loadContributor();
 
   if (auth && currentTab?.url) {
-    try {
-      const r = await ffMatchProjects(currentTab.url);
-      matchedProjects = r.matches || [];
-      allProjects = r.all || [];
-    } catch (err) {
-      console.warn("feeeeedback: match projects failed", err);
-    }
+    await refreshProjects();
   }
   render();
   applyContributorToUI();
   listenForAuth();
+}
+
+async function refreshProjects() {
+  try {
+    const r = await ffMatchProjects(currentTab.url);
+    matchedProjects = r.matches || [];
+    allProjects = r.all || [];
+  } catch (err) {
+    console.warn("feeeeedback: match projects failed", err);
+    matchedProjects = [];
+    allProjects = [];
+  }
 }
 
 async function loadContributor() {
@@ -99,13 +98,7 @@ function listenForAuth() {
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== "local" || !changes.ff_auth) return;
     auth = changes.ff_auth.newValue || null;
-    if (auth && currentTab?.url) {
-      try {
-        const r = await ffMatchProjects(currentTab.url);
-        matchedProjects = r.matches || [];
-        allProjects = r.all || [];
-      } catch {}
-    }
+    if (auth && currentTab?.url) await refreshProjects();
     render();
     applyContributorToUI();
   });
@@ -116,17 +109,10 @@ function render() {
   els.status.textContent = active ? "actif" : "inactif";
   els.status.className = `status ${active ? "status-on" : "status-off"}`;
 
-  els.authNone.hidden = !!auth || active || !!pendingEmail;
-  els.authSent.hidden = !!auth || active || !pendingEmail;
+  els.authNone.hidden = !!auth || active;
   els.authLoaded.hidden = !auth || active;
 
   if (auth) {
-    els.userName.textContent = auth.user?.name || auth.user?.email || "";
-    els.userEmail.textContent = auth.user?.email || "";
-    els.userAvatar.textContent = (auth.user?.name || auth.user?.email || "?")
-      .slice(0, 2)
-      .toUpperCase();
-
     els.tabUrl.textContent = currentTab?.url ? ffShortUrl(currentTab.url) : "—";
 
     const select = els.projectSelect;
@@ -154,11 +140,12 @@ function render() {
     if (matchedProjects.length) select.value = matchedProjects[0].id;
   }
 
-  els.sessionActions.hidden = !auth || !!pendingEmail;
+  els.sessionActions.hidden = !auth && !active;
   els.meta.hidden = !active;
   els.extraActions.hidden = !active;
 
   if (auth && !active) {
+    els.sessionActions.hidden = false;
     els.toggleBtn.textContent = "Démarrer une session";
     els.toggleBtn.classList.add("btn-primary");
     els.toggleBtn.classList.remove("btn-danger");
@@ -167,6 +154,8 @@ function render() {
     els.toggleBtn.textContent = "Arrêter la session";
     els.toggleBtn.classList.remove("btn-primary");
     els.toggleBtn.classList.add("btn-danger");
+  } else {
+    els.sessionActions.hidden = true;
   }
 
   if (active) {
@@ -175,8 +164,6 @@ function render() {
     els.contributorLabel.textContent = session?.contributorName || "—";
     els.dashBtn.hidden = !(session?.mode === "cloud" && auth?.apiUrl);
   }
-
-  if (pendingEmail) els.sentEmail.textContent = pendingEmail;
 }
 
 function projectOption(p) {
@@ -187,45 +174,48 @@ function projectOption(p) {
 }
 
 function showErr(msg) {
-  els.magicErr.textContent = msg;
-  els.magicErr.hidden = !msg;
+  els.unlockErr.textContent = msg;
+  els.unlockErr.hidden = !msg;
 }
 
 // --- handlers --------------------------------------------------------------
 
-els.magicForm?.addEventListener("submit", async (e) => {
+els.unlockForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = els.emailInput.value.trim();
-  if (!email) return;
+  const password = els.passwordInput.value;
+  if (!password) return;
   showErr("");
-  els.magicBtn.disabled = true;
-  els.magicBtn.textContent = "Envoi…";
+  els.unlockBtn.disabled = true;
+  els.unlockBtn.textContent = "…";
   try {
-    const res = await fetch(`${API_BASE}/api/auth/sign-in/magic-link`, {
+    const res = await fetch(`${API_BASE}/api/v1/extension/unlock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        callbackURL: "/extension/auto-connect",
-      }),
+      body: JSON.stringify({ password }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) {
-      throw new Error(data.error?.message || data.message || "Impossible d'envoyer le lien");
-    }
-    pendingEmail = email;
+    if (!res.ok) throw new Error(data.error || "Mot de passe incorrect");
+    await chrome.runtime.sendMessage({
+      type: "FF_STORE_AUTH",
+      payload: {
+        apiKey: data.apiKey,
+        apiUrl: API_BASE,
+        user: data.user,
+        orgs: data.orgs || [],
+        linkedAt: new Date().toISOString(),
+      },
+    });
+    auth = await ffGetAuth();
+    if (currentTab?.url) await refreshProjects();
+    els.passwordInput.value = "";
     render();
+    applyContributorToUI();
   } catch (err) {
     showErr(err.message || "Erreur");
   } finally {
-    els.magicBtn.disabled = false;
-    els.magicBtn.textContent = "M'envoyer le lien";
+    els.unlockBtn.disabled = false;
+    els.unlockBtn.textContent = "Déverrouiller";
   }
-});
-
-els.backBtn?.addEventListener("click", () => {
-  pendingEmail = null;
-  render();
 });
 
 els.localStartBtn?.addEventListener("click", async () => {
@@ -237,8 +227,7 @@ els.localStartBtn?.addEventListener("click", async () => {
   window.close();
 });
 
-els.signOutBtn?.addEventListener("click", async () => {
-  if (!confirm("Déconnecter l'extension ?")) return;
+els.lockBtn?.addEventListener("click", async () => {
   await ffClearAuth();
   auth = null;
   render();
@@ -275,7 +264,7 @@ els.toggleBtn?.addEventListener("click", async () => {
     return;
   }
 
-  const projectId = els.projectSelect.value;
+  const projectId = els.projectSelect?.value || "";
   let meta = { contributorName };
   if (projectId && auth) {
     const proj = [...matchedProjects, ...allProjects].find((p) => p.id === projectId);
