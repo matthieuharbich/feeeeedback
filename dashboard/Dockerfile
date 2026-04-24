@@ -2,7 +2,7 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=optional
+RUN npm ci
 
 FROM node:22-alpine AS builder
 WORKDIR /app
@@ -19,7 +19,7 @@ RUN addgroup -S app && adduser -S app -G app
 
 # Production deps for runtime migrator + app
 COPY --from=builder --chown=app:app /app/package.json /app/package-lock.json ./
-RUN npm ci --omit=dev --omit=optional && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # App bundle (non-standalone: standard .next + code)
 COPY --from=builder --chown=app:app /app/.next ./.next
