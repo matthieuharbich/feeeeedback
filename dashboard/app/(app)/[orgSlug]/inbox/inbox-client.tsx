@@ -12,11 +12,12 @@ import {
   ExternalLink,
   Copy,
   Check,
-  Filter,
   ArrowDownUp,
+  Home,
+  ChevronRight,
+  Filter,
 } from "lucide-react";
-import { Avatar } from "@/components/avatar";
-import { cn, contributorColor, formatDate, shortUrl, timeAgo } from "@/lib/utils";
+import { cn, contributorColor, formatDate, shortUrl, timeAgo, dayKey } from "@/lib/utils";
 
 type Project = { id: string; name: string; slug: string; color: string };
 type Comment = {
@@ -45,6 +46,10 @@ type View = "grid" | "list" | "board";
 type Sort = "newest" | "oldest";
 type GroupBy = "project" | "contributor";
 
+function parseList(v: string | null): string[] {
+  return (v || "").split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 export function InboxClient({
   orgSlug,
   projects,
@@ -59,15 +64,15 @@ export function InboxClient({
   const sp = useSearchParams();
 
   const qParam = sp.get("q") || "";
-  const projectParam = sp.get("project") || "";
-  const contributorParam = sp.get("contributor") || "";
+  const projectsSel = parseList(sp.get("projects"));
+  const contributorsSel = parseList(sp.get("contributors"));
   const viewParam = (sp.get("view") as View) || "grid";
   const sortParam = (sp.get("sort") as Sort) || "newest";
   const groupParam = (sp.get("group") as GroupBy) || "project";
 
   const [q, setQ] = useState(qParam);
+  const [searchOpen, setSearchOpen] = useState(!!qParam);
 
-  // Sync local search input to URL (debounced)
   useEffect(() => {
     const t = setTimeout(() => {
       if (q !== qParam) updateParam("q", q || null);
@@ -85,10 +90,10 @@ export function InboxClient({
   const filtered = useMemo(() => {
     const qLower = qParam.toLowerCase();
     return comments
-      .filter((c) => (projectParam ? c.projectSlug === projectParam : true))
+      .filter((c) => (projectsSel.length ? projectsSel.includes(c.projectSlug) : true))
       .filter((c) =>
-        contributorParam
-          ? (c.contributorName || "").toLowerCase() === contributorParam.toLowerCase()
+        contributorsSel.length
+          ? contributorsSel.includes((c.contributorName || "").trim())
           : true
       )
       .filter((c) => {
@@ -102,7 +107,7 @@ export function InboxClient({
           c.selector.toLowerCase().includes(qLower)
         );
       });
-  }, [comments, qParam, projectParam, contributorParam]);
+  }, [comments, qParam, projectsSel, contributorsSel]);
 
   const sorted = useMemo(() => {
     const rows = [...filtered];
@@ -112,6 +117,19 @@ export function InboxClient({
     });
     return rows;
   }, [filtered, sortParam]);
+
+  const stats = useMemo(() => {
+    const todayKey = dayKey(new Date());
+    const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const today = comments.filter((c) => dayKey(c.createdAt) === todayKey).length;
+    const week = comments.filter((c) => new Date(c.createdAt).getTime() >= weekAgo).length;
+    return {
+      total: comments.length,
+      shown: sorted.length,
+      today,
+      week,
+    };
+  }, [comments, sorted]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? sorted.find((c) => c.id === activeId) || null : null;
@@ -123,53 +141,94 @@ export function InboxClient({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
-  const stats = {
-    total: comments.length,
-    shown: sorted.length,
-    projects: new Set(sorted.map((c) => c.projectId)).size,
-    contributors: new Set(sorted.map((c) => c.contributorName).filter(Boolean)).size,
-  };
+  function toggleList(key: "projects" | "contributors", value: string) {
+    const current = key === "projects" ? projectsSel : contributorsSel;
+    const next = current.includes(value)
+      ? current.filter((x) => x !== value)
+      : [...current, value];
+    updateParam(key, next.length ? next.join(",") : null);
+  }
+
+  function clearAll() {
+    setQ("");
+    const params = new URLSearchParams();
+    if (viewParam !== "grid") params.set("view", viewParam);
+    if (sortParam !== "newest") params.set("sort", sortParam);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  const hasFilters = qParam || projectsSel.length > 0 || contributorsSel.length > 0;
 
   return (
     <div className="min-h-[calc(100vh-56px)] bg-[color:var(--color-surface)]">
-      <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Inbox</h1>
-            <p className="text-sm text-[color:var(--color-ink-muted)] mt-1">
-              {stats.shown === stats.total
-                ? `${stats.total} retour${stats.total > 1 ? "s" : ""}`
-                : `${stats.shown} / ${stats.total} retours`}
-              {" · "}
-              {stats.projects} projet{stats.projects > 1 ? "s" : ""}
-              {" · "}
-              {stats.contributors} contributeur{stats.contributors > 1 ? "s" : ""}
-            </p>
-          </div>
+      <div className="max-w-[1500px] mx-auto px-4 md:px-10 py-8">
+        {/* Breadcrumbs + icon toolbar */}
+        <div className="flex items-center justify-between mb-4 gap-4">
+          <nav className="flex items-center gap-1.5 text-sm text-[color:var(--color-ink-muted)] min-w-0">
+            <Link href="/" className="hover:text-[color:var(--color-ink)]">
+              <Home size={14} />
+            </Link>
+            <ChevronRight size={13} className="opacity-50" />
+            <Link href={`/${orgSlug}/inbox`} className="hover:text-[color:var(--color-ink)] capitalize">
+              {orgSlug}
+            </Link>
+            <ChevronRight size={13} className="opacity-50" />
+            <span className="text-[color:var(--color-ink)]">Inbox</span>
+          </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setSearchOpen((s) => !s)}
+              className={cn(
+                "p-2 rounded-xl border transition-colors",
+                searchOpen || qParam
+                  ? "bg-[color:var(--color-ink)] text-white border-[color:var(--color-ink)]"
+                  : "bg-white border-[color:var(--color-line)] text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
+              )}
+              title="Rechercher"
+            >
+              <Search size={16} />
+            </button>
             <ViewSwitcher
               value={viewParam}
               onChange={(v) => updateParam("view", v === "grid" ? null : v)}
             />
-            <SortToggle
-              value={sortParam}
-              onChange={(s) => updateParam("sort", s === "newest" ? null : s)}
-            />
+            <button
+              onClick={() => updateParam("sort", sortParam === "newest" ? "oldest" : null)}
+              className="flex items-center gap-1.5 bg-white border border-[color:var(--color-line)] rounded-xl px-3 py-2 text-sm text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
+              title="Changer le tri"
+            >
+              <ArrowDownUp size={14} />
+              {sortParam === "newest" ? "Récents" : "Anciens"}
+            </button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-2xl border border-[color:var(--color-line)] p-3 mb-5 flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-            <Search size={16} className="text-[color:var(--color-ink-muted)] ml-1" />
+        {/* Title */}
+        <div className="mb-6">
+          <h1 className="text-4xl font-semibold tracking-tight">Inbox</h1>
+          <p className="text-sm text-[color:var(--color-ink-muted)] mt-1.5">
+            {stats.shown === stats.total
+              ? `${stats.total} retour${stats.total > 1 ? "s" : ""}`
+              : `${stats.shown} / ${stats.total} retours`}
+            {" · "}
+            {projects.length} projet{projects.length > 1 ? "s" : ""}
+            {" · "}
+            {contributors.length} contributeur{contributors.length > 1 ? "s" : ""}
+          </p>
+        </div>
+
+        {/* Search bar */}
+        {searchOpen && (
+          <div className="bg-white rounded-2xl border border-[color:var(--color-line)] px-4 py-2.5 mb-4 flex items-center gap-3 shadow-sm">
+            <Search size={16} className="text-[color:var(--color-ink-muted)]" />
             <input
               type="text"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Chercher un commentaire, un sélecteur, une URL…"
-              className="flex-1 bg-transparent border-0 outline-none text-sm placeholder:text-[color:var(--color-ink-muted)] py-1"
+              placeholder="Chercher un commentaire, une URL, un sélecteur…"
+              className="flex-1 bg-transparent border-0 outline-none text-sm placeholder:text-[color:var(--color-ink-muted)]"
+              autoFocus
             />
             {q && (
               <button
@@ -180,73 +239,85 @@ export function InboxClient({
               </button>
             )}
           </div>
+        )}
 
-          <span className="h-6 w-px bg-[color:var(--color-line)] mx-1 hidden md:block" />
-
-          <FilterMenu
-            icon={<Filter size={13} />}
-            label="Projet"
-            options={[
-              { value: "", label: "Tous les projets" },
-              ...projects.map((p) => ({
-                value: p.slug,
-                label: p.name,
-                dot: p.color,
-              })),
-            ]}
-            selected={projectParam}
-            onSelect={(v) => updateParam("project", v || null)}
+        {/* Stats cards */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <StatCard
+            label="Total"
+            value={stats.total}
+            subtitle={`${stats.shown} affichés`}
+            ringRatio={stats.total === 0 ? 0 : stats.shown / stats.total}
+            ringColor="#ff6b35"
           />
-
-          <FilterMenu
-            icon={<Filter size={13} />}
-            label="Contributeur"
-            options={[
-              { value: "", label: "Tout le monde" },
-              ...contributors.map((c) => ({ value: c, label: c })),
-            ]}
-            selected={contributorParam}
-            onSelect={(v) => updateParam("contributor", v || null)}
+          <StatCard
+            label="Cette semaine"
+            value={stats.week}
+            subtitle={stats.week === 1 ? "retour capturé" : "retours capturés"}
+            ringRatio={stats.total === 0 ? 0 : stats.week / stats.total}
+            ringColor="#4ade80"
           />
+          <StatCard
+            label="Aujourd'hui"
+            value={stats.today}
+            subtitle={stats.today === 1 ? "nouveau retour" : "nouveaux retours"}
+            ringRatio={stats.total === 0 ? 0 : stats.today / stats.total}
+            ringColor="#3b82f6"
+          />
+        </div>
 
-          {(projectParam || contributorParam || qParam) && (
+        {/* Filter pills */}
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          {projects.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {projects.map((p) => (
+                <PillToggle
+                  key={p.id}
+                  active={projectsSel.includes(p.slug)}
+                  onClick={() => toggleList("projects", p.slug)}
+                  color={p.color}
+                  dot
+                >
+                  {p.name}
+                </PillToggle>
+              ))}
+            </div>
+          )}
+
+          {projects.length > 0 && contributors.length > 0 && (
+            <span className="h-6 w-px bg-[color:var(--color-line)] mx-1" />
+          )}
+
+          {contributors.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {contributors.map((c) => (
+                <PillToggle
+                  key={c}
+                  active={contributorsSel.includes(c)}
+                  onClick={() => toggleList("contributors", c)}
+                  color={contributorColor(c).fg}
+                  contributor={c}
+                >
+                  {c}
+                </PillToggle>
+              ))}
+            </div>
+          )}
+
+          {hasFilters && (
             <button
-              onClick={() => {
-                setQ("");
-                const params = new URLSearchParams();
-                if (viewParam !== "grid") params.set("view", viewParam);
-                if (sortParam !== "newest") params.set("sort", sortParam);
-                router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-              }}
-              className="text-xs text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] px-2 py-1"
+              onClick={clearAll}
+              className="ml-auto text-xs text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] flex items-center gap-1 px-2 py-1"
             >
+              <X size={12} />
               Effacer
             </button>
           )}
         </div>
 
-        {/* Active filter chips */}
-        {(projectParam || contributorParam) && (
-          <div className="flex items-center gap-2 mb-5 flex-wrap">
-            {projectParam && (
-              <FilterChip
-                label={projects.find((p) => p.slug === projectParam)?.name || projectParam}
-                dot={projects.find((p) => p.slug === projectParam)?.color}
-                onRemove={() => updateParam("project", null)}
-              />
-            )}
-            {contributorParam && (
-              <FilterChip label={contributorParam} onRemove={() => updateParam("contributor", null)} />
-            )}
-          </div>
-        )}
-
         {/* Content */}
         {sorted.length === 0 ? (
-          <EmptyResults
-            hasFilters={!!(qParam || projectParam || contributorParam)}
-            orgSlug={orgSlug}
-          />
+          <EmptyResults hasFilters={!!hasFilters} orgSlug={orgSlug} />
         ) : viewParam === "list" ? (
           <ListView comments={sorted} onSelect={setActiveId} />
         ) : viewParam === "board" ? (
@@ -268,7 +339,111 @@ export function InboxClient({
   );
 }
 
-// ---------- View switcher + sort ----------
+// ---------- Small components ----------
+
+function StatCard({
+  label,
+  value,
+  subtitle,
+  ringRatio,
+  ringColor,
+}: {
+  label: string;
+  value: number;
+  subtitle: string;
+  ringRatio: number;
+  ringColor: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-[color:var(--color-line)] p-5 flex items-center gap-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-[color:var(--color-ink-muted)] uppercase tracking-wider font-medium">
+          {label}
+        </div>
+        <div className="text-3xl font-semibold tracking-tight mt-1 tabular-nums">{value}</div>
+        <div className="text-xs text-[color:var(--color-ink-muted)] mt-1 truncate">{subtitle}</div>
+      </div>
+      <CircularProgress ratio={ringRatio} color={ringColor} size={56} />
+    </div>
+  );
+}
+
+function CircularProgress({
+  ratio,
+  color,
+  size = 48,
+}: {
+  ratio: number;
+  color: string;
+  size?: number;
+}) {
+  const clamped = Math.max(0, Math.min(1, ratio || 0));
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const dash = c * clamped;
+  return (
+    <svg width={size} height={size} className="flex-shrink-0" style={{ transform: "rotate(-90deg)" }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f0f0f0" strokeWidth={stroke} />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeDasharray={`${dash} ${c}`}
+        strokeLinecap="round"
+        style={{ transition: "stroke-dasharray 300ms ease" }}
+      />
+    </svg>
+  );
+}
+
+function PillToggle({
+  active,
+  onClick,
+  color,
+  dot,
+  contributor,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  color?: string;
+  dot?: boolean;
+  contributor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-2 pl-3 pr-1.5 py-1 rounded-full text-sm border transition-all",
+        "bg-white hover:border-[color:var(--color-ink)]/20",
+        active
+          ? "border-[color:var(--color-ink)]/10 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+          : "border-[color:var(--color-line)]"
+      )}
+    >
+      {dot && color && (
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+      )}
+      {contributor && <ContributorAvatar name={contributor} size={20} />}
+      <span className={cn("font-medium", !active && "text-[color:var(--color-ink-muted)]")}>
+        {children}
+      </span>
+      <span
+        className={cn(
+          "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors",
+          active ? "bg-[color:var(--color-ink)] text-white" : "bg-[color:var(--color-surface-2)] text-transparent"
+        )}
+      >
+        <Check size={12} strokeWidth={3} />
+      </span>
+    </button>
+  );
+}
 
 function ViewSwitcher({ value, onChange }: { value: View; onChange: (v: View) => void }) {
   const btn =
@@ -301,107 +476,6 @@ function ViewSwitcher({ value, onChange }: { value: View; onChange: (v: View) =>
   );
 }
 
-function SortToggle({ value, onChange }: { value: Sort; onChange: (s: Sort) => void }) {
-  return (
-    <button
-      onClick={() => onChange(value === "newest" ? "oldest" : "newest")}
-      className="flex items-center gap-1.5 bg-white border border-[color:var(--color-line)] rounded-xl px-3 py-2 text-sm text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
-      title="Changer le tri"
-    >
-      <ArrowDownUp size={14} />
-      {value === "newest" ? "Récents" : "Anciens"}
-    </button>
-  );
-}
-
-// ---------- Filter menu (lightweight dropdown) ----------
-
-function FilterMenu({
-  icon,
-  label,
-  options,
-  selected,
-  onSelect,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  options: { value: string; label: string; dot?: string }[];
-  selected: string;
-  onSelect: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const activeOption = options.find((o) => o.value === selected);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors",
-          selected
-            ? "bg-[color:var(--color-ink)] text-white hover:bg-[color:var(--color-ink)]/90"
-            : "text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] hover:bg-[color:var(--color-surface-2)]"
-        )}
-      >
-        {!selected && icon}
-        {activeOption?.dot && (
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: activeOption.dot }}
-          />
-        )}
-        {selected ? activeOption?.label : label}
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 min-w-[220px] bg-white border border-[color:var(--color-line)] rounded-xl shadow-lg py-1 z-40 max-h-[320px] overflow-y-auto">
-            {options.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => {
-                  onSelect(o.value);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--color-surface-2)]",
-                  o.value === selected && "font-medium"
-                )}
-              >
-                {o.dot && <span className="w-2 h-2 rounded-full" style={{ background: o.dot }} />}
-                <span className="truncate flex-1">{o.label}</span>
-                {o.value === selected && <Check size={14} className="text-[color:var(--color-accent)]" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function FilterChip({
-  label,
-  dot,
-  onRemove,
-}: {
-  label: string;
-  dot?: string;
-  onRemove: () => void;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5 bg-white border border-[color:var(--color-line)] rounded-full pl-3 pr-1 py-1 text-xs">
-      {dot && <span className="w-2 h-2 rounded-full" style={{ background: dot }} />}
-      <span>{label}</span>
-      <button
-        onClick={onRemove}
-        className="p-1 rounded-full hover:bg-[color:var(--color-surface-2)] text-[color:var(--color-ink-muted)]"
-      >
-        <X size={12} />
-      </button>
-    </span>
-  );
-}
-
 // ---------- Views ----------
 
 function GridView({ comments, onSelect }: { comments: Comment[]; onSelect: (id: string) => void }) {
@@ -416,7 +490,7 @@ function GridView({ comments, onSelect }: { comments: Comment[]; onSelect: (id: 
 
 function ListView({ comments, onSelect }: { comments: Comment[]; onSelect: (id: string) => void }) {
   return (
-    <div className="bg-white rounded-2xl border border-[color:var(--color-line)] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-[color:var(--color-line)] overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
       {comments.map((c, i) => (
         <RowItem
           key={c.id}
@@ -557,7 +631,7 @@ function ScreenshotThumb({ c, heightClass }: { c: Comment; heightClass?: string 
   );
 }
 
-function ContributorAvatar({ name }: { name: string | null }) {
+function ContributorAvatar({ name, size = 24 }: { name: string | null; size?: number }) {
   const color = contributorColor(name || "?");
   const initials = (name || "?")
     .split(/\s+/)
@@ -567,8 +641,14 @@ function ContributorAvatar({ name }: { name: string | null }) {
     .join("");
   return (
     <span
-      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0"
-      style={{ background: color.bg, color: color.fg }}
+      className="rounded-full flex items-center justify-center font-semibold flex-shrink-0"
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.max(9, size * 0.38),
+        background: color.bg,
+        color: color.fg,
+      }}
     >
       {initials}
     </span>
@@ -579,7 +659,7 @@ function CardFull({ c, onSelect }: { c: Comment; onSelect: (id: string) => void 
   return (
     <button
       onClick={() => onSelect(c.id)}
-      className="group text-left bg-white border border-[color:var(--color-line)] rounded-2xl overflow-hidden hover:shadow-md hover:border-[color:var(--color-ink)]/10 transition-all"
+      className="group text-left bg-white border border-[color:var(--color-line)] rounded-2xl overflow-hidden hover:shadow-md hover:border-[color:var(--color-ink)]/10 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
     >
       <div className="p-3 pb-0">
         <ScreenshotThumb c={c} heightClass="h-52" />
@@ -606,7 +686,7 @@ function CardFull({ c, onSelect }: { c: Comment; onSelect: (id: string) => void 
         </p>
 
         <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] flex items-center gap-2">
-          <ContributorAvatar name={c.contributorName} />
+          <ContributorAvatar name={c.contributorName} size={24} />
           <span className="text-xs font-medium truncate">{c.contributorName || "—"}</span>
           <span className="text-[color:var(--color-ink-muted)] text-xs">·</span>
           <span className="text-xs text-[color:var(--color-ink-muted)] truncate font-mono">
@@ -631,7 +711,7 @@ function CardCompact({ c, onSelect }: { c: Comment; onSelect: (id: string) => vo
         <p className="text-sm leading-snug line-clamp-2 text-[color:var(--color-ink)]">{c.comment}</p>
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <ContributorAvatar name={c.contributorName} />
+            <ContributorAvatar name={c.contributorName} size={20} />
             <span className="text-xs text-[color:var(--color-ink-muted)] truncate">
               {c.contributorName || "—"}
             </span>
@@ -660,7 +740,8 @@ function RowItem({
         !last && "border-b border-[color:var(--color-line)]"
       )}
     >
-      <div className="flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden border border-[color:var(--color-line)]"
+      <div
+        className="flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden border border-[color:var(--color-line)]"
         style={{
           background:
             "repeating-conic-gradient(#f4f4f4 0% 25%, #fafafa 0% 50%) 50% / 12px 12px",
@@ -682,7 +763,7 @@ function RowItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <ContributorAvatar name={c.contributorName} />
+          <ContributorAvatar name={c.contributorName} size={20} />
           <span className="text-sm font-medium truncate">{c.contributorName || "—"}</span>
           <span
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
@@ -711,6 +792,9 @@ function EmptyResults({ hasFilters, orgSlug }: { hasFilters: boolean; orgSlug: s
   if (hasFilters) {
     return (
       <div className="bg-white border border-[color:var(--color-line)] rounded-2xl p-16 text-center">
+        <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[color:var(--color-surface-2)] flex items-center justify-center text-[color:var(--color-ink-muted)]">
+          <Filter size={18} />
+        </div>
         <h3 className="text-lg font-medium mb-2">Aucun résultat</h3>
         <p className="text-sm text-[color:var(--color-ink-muted)]">
           Essaie d'affiner ou d'effacer les filtres.
@@ -765,10 +849,9 @@ function Drawer({ comment, onClose }: { comment: Comment; onClose: () => void })
         aria-label="Fermer"
       />
       <aside className="w-full max-w-2xl bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
-        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-[color:var(--color-line)] px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-3 min-w-0">
-            <ContributorAvatar name={comment.contributorName} />
+            <ContributorAvatar name={comment.contributorName} size={28} />
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{comment.contributorName || "—"}</div>
               <div className="text-xs text-[color:var(--color-ink-muted)]">
@@ -784,7 +867,6 @@ function Drawer({ comment, onClose }: { comment: Comment; onClose: () => void })
           </button>
         </div>
 
-        {/* Screenshot */}
         {comment.screenshotPath && (
           <div
             className="border-b border-[color:var(--color-line)]"
@@ -810,7 +892,6 @@ function Drawer({ comment, onClose }: { comment: Comment; onClose: () => void })
           </div>
         )}
 
-        {/* Body */}
         <div className="px-6 py-6 flex-1">
           <div className="flex items-center gap-2 mb-4">
             <span
@@ -890,7 +971,6 @@ function Drawer({ comment, onClose }: { comment: Comment; onClose: () => void })
           </div>
         </div>
 
-        {/* Footer actions */}
         <div className="sticky bottom-0 bg-white border-t border-[color:var(--color-line)] px-6 py-3 flex items-center justify-end gap-2">
           <a
             href={comment.url}

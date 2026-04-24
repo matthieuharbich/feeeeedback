@@ -10,6 +10,11 @@
   outline-offset: 2px !important;
 }
 
+/* When capturing, suppress our outlines so the screenshot stays clean */
+.ff-capture-hide-outline {
+  outline: none !important;
+}
+
 /* ===== floating widget ===== */
 .ff-widget {
   position: fixed !important;

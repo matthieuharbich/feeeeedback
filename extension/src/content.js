@@ -281,7 +281,31 @@
   }
 
   async function captureAndCrop(viewRect) {
-    const res = await chrome.runtime.sendMessage({ type: "FF_CAPTURE_TAB" });
+    // Hide our own UI before capturing so it does not end up in the screenshot.
+    const ui = document.querySelectorAll(".ff-panel, .ff-widget, .ff-banner");
+    const prevVisibility = [];
+    ui.forEach((el) => {
+      prevVisibility.push(el.style.visibility);
+      el.style.visibility = "hidden";
+    });
+    // Also drop any hover outline on the target element during capture.
+    const marked = document.querySelectorAll("." + MARKED_CLASS + ", ." + OUTLINE_CLASS);
+    marked.forEach((el) => el.classList.add("ff-capture-hide-outline"));
+
+    // Wait two animation frames so the browser paints without our UI.
+    await new Promise((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(r))
+    );
+
+    let res;
+    try {
+      res = await chrome.runtime.sendMessage({ type: "FF_CAPTURE_TAB" });
+    } finally {
+      ui.forEach((el, i) => {
+        el.style.visibility = prevVisibility[i] || "";
+      });
+      marked.forEach((el) => el.classList.remove("ff-capture-hide-outline"));
+    }
     if (!res?.dataUrl) throw new Error(res?.error || "capture failed");
     const img = new Image();
     img.src = res.dataUrl;
