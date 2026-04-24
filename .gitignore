@@ -22,3 +22,6 @@ dashboard/uploads/
 
 # drizzle artifacts
 dashboard/drizzle/meta/_journal.json.lock
+
+# packaged extension ZIPs
+feeeeedback-extension-*.zip
