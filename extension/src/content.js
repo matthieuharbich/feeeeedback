@@ -321,15 +321,6 @@
     canvas.height = sh;
     const ctx = canvas.getContext("2d");
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    // draw element outline for context
-    ctx.strokeStyle = "#ff6b35";
-    ctx.lineWidth = Math.max(2, 2 * dpr);
-    ctx.strokeRect(
-      pad,
-      pad,
-      Math.round(viewRect.width * dpr),
-      Math.round(viewRect.height * dpr)
-    );
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     return { blob, width: sw, height: sh };
   }
