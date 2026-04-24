@@ -16,6 +16,7 @@ import {
   Home,
   ChevronRight,
   Filter,
+  MoreHorizontal,
 } from "lucide-react";
 import { cn, contributorColor, formatDate, shortUrl, timeAgo, dayKey } from "@/lib/utils";
 
@@ -66,6 +67,7 @@ export function InboxClient({
   const qParam = sp.get("q") || "";
   const projectsSel = parseList(sp.get("projects"));
   const contributorsSel = parseList(sp.get("contributors"));
+  const daySel = sp.get("day") || "";
   const viewParam = (sp.get("view") as View) || "grid";
   const sortParam = (sp.get("sort") as Sort) || "newest";
   const groupParam = (sp.get("group") as GroupBy) || "project";
@@ -87,6 +89,22 @@ export function InboxClient({
     return Array.from(set).sort();
   }, [comments]);
 
+  const contributorCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of comments) {
+      if (!c.contributorName) continue;
+      m.set(c.contributorName, (m.get(c.contributorName) || 0) + 1);
+    }
+    return m;
+  }, [comments]);
+
+  // Unique days (newest first) for the left rail
+  const days = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of comments) set.add(dayKey(c.createdAt));
+    return Array.from(set).sort((a, b) => (a > b ? -1 : 1)).slice(0, 21);
+  }, [comments]);
+
   const filtered = useMemo(() => {
     const qLower = qParam.toLowerCase();
     return comments
@@ -96,6 +114,7 @@ export function InboxClient({
           ? contributorsSel.includes((c.contributorName || "").trim())
           : true
       )
+      .filter((c) => (daySel ? dayKey(c.createdAt) === daySel : true))
       .filter((c) => {
         if (!qLower) return true;
         return (
@@ -107,7 +126,7 @@ export function InboxClient({
           c.selector.toLowerCase().includes(qLower)
         );
       });
-  }, [comments, qParam, projectsSel, contributorsSel]);
+  }, [comments, qParam, projectsSel, contributorsSel, daySel]);
 
   const sorted = useMemo(() => {
     const rows = [...filtered];
@@ -128,8 +147,16 @@ export function InboxClient({
       shown: sorted.length,
       today,
       week,
+      older: Math.max(0, comments.length - week),
     };
   }, [comments, sorted]);
+
+  const latest = comments[0];
+  const topContributors = useMemo(() => {
+    return Array.from(contributorCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+  }, [contributorCounts]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? sorted.find((c) => c.id === activeId) || null : null;
@@ -157,13 +184,14 @@ export function InboxClient({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
-  const hasFilters = qParam || projectsSel.length > 0 || contributorsSel.length > 0;
+  const hasFilters =
+    qParam || projectsSel.length > 0 || contributorsSel.length > 0 || daySel;
 
   return (
     <div className="min-h-[calc(100vh-56px)] bg-[color:var(--color-surface)]">
-      <div className="max-w-[1500px] mx-auto px-4 md:px-10 py-8">
-        {/* Breadcrumbs + icon toolbar */}
-        <div className="flex items-center justify-between mb-4 gap-4">
+      <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-6">
+        {/* Top: breadcrumbs + icon toolbar */}
+        <div className="flex items-center justify-between mb-5 gap-4">
           <nav className="flex items-center gap-1.5 text-sm text-[color:var(--color-ink-muted)] min-w-0">
             <Link href="/" className="hover:text-[color:var(--color-ink)]">
               <Home size={14} />
@@ -177,50 +205,72 @@ export function InboxClient({
           </nav>
 
           <div className="flex items-center gap-1.5">
-            <button
+            <IconButton
+              active={searchOpen || !!qParam}
               onClick={() => setSearchOpen((s) => !s)}
-              className={cn(
-                "p-2 rounded-xl border transition-colors",
-                searchOpen || qParam
-                  ? "bg-[color:var(--color-ink)] text-white border-[color:var(--color-ink)]"
-                  : "bg-white border-[color:var(--color-line)] text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
-              )}
               title="Rechercher"
             >
               <Search size={16} />
-            </button>
-            <ViewSwitcher
-              value={viewParam}
-              onChange={(v) => updateParam("view", v === "grid" ? null : v)}
-            />
-            <button
-              onClick={() => updateParam("sort", sortParam === "newest" ? "oldest" : null)}
-              className="flex items-center gap-1.5 bg-white border border-[color:var(--color-line)] rounded-xl px-3 py-2 text-sm text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
-              title="Changer le tri"
+            </IconButton>
+            <IconButton
+              active={viewParam === "grid"}
+              onClick={() => updateParam("view", null)}
+              title="Grille"
             >
-              <ArrowDownUp size={14} />
-              {sortParam === "newest" ? "Récents" : "Anciens"}
-            </button>
+              <LayoutGrid size={16} />
+            </IconButton>
+            <IconButton
+              active={viewParam === "list"}
+              onClick={() => updateParam("view", "list")}
+              title="Liste"
+            >
+              <Rows3 size={16} />
+            </IconButton>
+            <IconButton
+              active={viewParam === "board"}
+              onClick={() => updateParam("view", "board")}
+              title="Tableau"
+            >
+              <Columns3 size={16} />
+            </IconButton>
+            <IconButton
+              onClick={() => updateParam("sort", sortParam === "newest" ? "oldest" : null)}
+              title="Tri"
+            >
+              <ArrowDownUp size={16} />
+            </IconButton>
           </div>
         </div>
 
         {/* Title */}
-        <div className="mb-6">
-          <h1 className="text-4xl font-semibold tracking-tight">Inbox</h1>
-          <p className="text-sm text-[color:var(--color-ink-muted)] mt-1.5">
-            {stats.shown === stats.total
-              ? `${stats.total} retour${stats.total > 1 ? "s" : ""}`
-              : `${stats.shown} / ${stats.total} retours`}
-            {" · "}
-            {projects.length} projet{projects.length > 1 ? "s" : ""}
-            {" · "}
-            {contributors.length} contributeur{contributors.length > 1 ? "s" : ""}
-          </p>
+        <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
+          <div>
+            <h1 className="text-4xl font-semibold tracking-tight">Inbox</h1>
+            <p className="text-sm text-[color:var(--color-ink-muted)] mt-1.5">
+              {stats.shown === stats.total
+                ? `${stats.total} retour${stats.total > 1 ? "s" : ""}`
+                : `${stats.shown} / ${stats.total} retours`}
+              {" · "}
+              {projects.length} projet{projects.length > 1 ? "s" : ""}
+              {" · "}
+              {contributors.length} contributeur{contributors.length > 1 ? "s" : ""}
+            </p>
+          </div>
+
+          {hasFilters && (
+            <button
+              onClick={clearAll}
+              className="text-xs text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-white"
+            >
+              <X size={12} />
+              Effacer les filtres
+            </button>
+          )}
         </div>
 
-        {/* Search bar */}
+        {/* Search bar (collapsed by default) */}
         {searchOpen && (
-          <div className="bg-white rounded-2xl border border-[color:var(--color-line)] px-4 py-2.5 mb-4 flex items-center gap-3 shadow-sm">
+          <div className="bg-white rounded-2xl border border-[color:var(--color-line)] px-4 py-2.5 mb-4 flex items-center gap-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
             <Search size={16} className="text-[color:var(--color-ink-muted)]" />
             <input
               type="text"
@@ -241,97 +291,68 @@ export function InboxClient({
           </div>
         )}
 
-        {/* Stats cards */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <StatCard
-            label="Total"
-            value={stats.total}
-            subtitle={`${stats.shown} affichés`}
-            ringRatio={stats.total === 0 ? 0 : stats.shown / stats.total}
-            ringColor="#ff6b35"
-          />
-          <StatCard
-            label="Cette semaine"
-            value={stats.week}
-            subtitle={stats.week === 1 ? "retour capturé" : "retours capturés"}
-            ringRatio={stats.total === 0 ? 0 : stats.week / stats.total}
-            ringColor="#4ade80"
-          />
-          <StatCard
-            label="Aujourd'hui"
-            value={stats.today}
-            subtitle={stats.today === 1 ? "nouveau retour" : "nouveaux retours"}
-            ringRatio={stats.total === 0 ? 0 : stats.today / stats.total}
-            ringColor="#3b82f6"
-          />
-        </div>
+        {/* Three-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[48px_340px_1fr] gap-4 items-start">
+          {/* Day rail */}
+          <div className="hidden lg:block sticky top-4">
+            <DayRail
+              days={days}
+              selected={daySel}
+              onSelect={(d) => updateParam("day", d || null)}
+            />
+          </div>
 
-        {/* Filter pills */}
-        <div className="flex items-center gap-2 mb-6 flex-wrap">
-          {projects.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {projects.map((p) => (
-                <PillToggle
-                  key={p.id}
-                  active={projectsSel.includes(p.slug)}
-                  onClick={() => toggleList("projects", p.slug)}
-                  color={p.color}
-                  dot
-                >
-                  {p.name}
-                </PillToggle>
-              ))}
+          {/* Left column — info cards */}
+          <div className="space-y-4">
+            <LatestCard comment={latest} onOpen={(id) => setActiveId(id)} />
+            <SummaryCard stats={stats} />
+            <ContributorsCard
+              items={topContributors}
+              selected={contributorsSel}
+              onToggle={(name) => toggleList("contributors", name)}
+            />
+          </div>
+
+          {/* Right — main panel */}
+          <div className="bg-white rounded-2xl border border-[color:var(--color-line)] shadow-[0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
+            <div className="px-4 py-3 border-b border-[color:var(--color-line)] flex items-center gap-2 flex-wrap">
+              {projects.length > 0 &&
+                projects.map((p) => (
+                  <PillToggle
+                    key={p.id}
+                    active={projectsSel.includes(p.slug)}
+                    onClick={() => toggleList("projects", p.slug)}
+                    color={p.color}
+                    dot
+                  >
+                    {p.name}
+                  </PillToggle>
+                ))}
+              <span className="ml-auto text-xs text-[color:var(--color-ink-muted)] tabular-nums">
+                {sorted.length} affiché{sorted.length > 1 ? "s" : ""}
+              </span>
             </div>
-          )}
 
-          {projects.length > 0 && contributors.length > 0 && (
-            <span className="h-6 w-px bg-[color:var(--color-line)] mx-1" />
-          )}
-
-          {contributors.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {contributors.map((c) => (
-                <PillToggle
-                  key={c}
-                  active={contributorsSel.includes(c)}
-                  onClick={() => toggleList("contributors", c)}
-                  color={contributorColor(c).fg}
-                  contributor={c}
-                >
-                  {c}
-                </PillToggle>
-              ))}
+            <div className="p-4">
+              {sorted.length === 0 ? (
+                <EmptyResults hasFilters={!!hasFilters} orgSlug={orgSlug} />
+              ) : viewParam === "list" ? (
+                <ListView comments={sorted} onSelect={setActiveId} />
+              ) : viewParam === "board" ? (
+                <BoardView
+                  comments={sorted}
+                  projects={projects}
+                  contributors={contributors}
+                  groupBy={groupParam}
+                  onSelect={setActiveId}
+                  onGroupChange={(g) => updateParam("group", g === "project" ? null : g)}
+                />
+              ) : (
+                <GridView comments={sorted} onSelect={setActiveId} />
+              )}
             </div>
-          )}
-
-          {hasFilters && (
-            <button
-              onClick={clearAll}
-              className="ml-auto text-xs text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] flex items-center gap-1 px-2 py-1"
-            >
-              <X size={12} />
-              Effacer
-            </button>
-          )}
+          </div>
         </div>
-
-        {/* Content */}
-        {sorted.length === 0 ? (
-          <EmptyResults hasFilters={!!hasFilters} orgSlug={orgSlug} />
-        ) : viewParam === "list" ? (
-          <ListView comments={sorted} onSelect={setActiveId} />
-        ) : viewParam === "board" ? (
-          <BoardView
-            comments={sorted}
-            projects={projects}
-            contributors={contributors}
-            groupBy={groupParam}
-            onSelect={setActiveId}
-            onGroupChange={(g) => updateParam("group", g === "project" ? null : g)}
-          />
-        ) : (
-          <GridView comments={sorted} onSelect={setActiveId} />
-        )}
       </div>
 
       {active && <Drawer comment={active} onClose={() => setActiveId(null)} />}
@@ -339,80 +360,342 @@ export function InboxClient({
   );
 }
 
-// ---------- Small components ----------
+// ---------- Top-right icon button ----------
 
-function StatCard({
-  label,
-  value,
-  subtitle,
-  ringRatio,
-  ringColor,
+function IconButton({
+  children,
+  active,
+  onClick,
+  title,
 }: {
-  label: string;
-  value: number;
-  subtitle: string;
-  ringRatio: number;
-  ringColor: string;
+  children: React.ReactNode;
+  active?: boolean;
+  onClick: () => void;
+  title: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-[color:var(--color-line)] p-5 flex items-center gap-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-[color:var(--color-ink-muted)] uppercase tracking-wider font-medium">
-          {label}
-        </div>
-        <div className="text-3xl font-semibold tracking-tight mt-1 tabular-nums">{value}</div>
-        <div className="text-xs text-[color:var(--color-ink-muted)] mt-1 truncate">{subtitle}</div>
-      </div>
-      <CircularProgress ratio={ringRatio} color={ringColor} size={56} />
+    <button
+      onClick={onClick}
+      title={title}
+      className={cn(
+        "w-9 h-9 rounded-xl flex items-center justify-center transition-colors border",
+        active
+          ? "bg-white border-[color:var(--color-line)] text-[color:var(--color-ink)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+          : "border-transparent text-[color:var(--color-ink-muted)] hover:bg-white hover:text-[color:var(--color-ink)]"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------- Day rail (left) ----------
+
+function DayRail({
+  days,
+  selected,
+  onSelect,
+}: {
+  days: string[];
+  selected: string;
+  onSelect: (day: string) => void;
+}) {
+  if (days.length === 0) return null;
+  return (
+    <div className="flex flex-col items-center gap-2 py-2 text-sm tabular-nums">
+      {days.map((d, i) => {
+        const day = new Date(d + "T00:00:00");
+        const num = day.getDate();
+        const isActive = selected === d;
+        const isToday = d === dayKey(new Date());
+        return (
+          <button
+            key={d}
+            onClick={() => onSelect(isActive ? "" : d)}
+            title={day.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long" })}
+            className={cn(
+              "relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium transition-colors",
+              isActive
+                ? "bg-[color:var(--color-ink)] text-white"
+                : isToday
+                ? "text-[color:var(--color-ink)] hover:bg-white"
+                : "text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] hover:bg-white"
+            )}
+          >
+            {num}
+            {isToday && !isActive && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[color:var(--color-accent)]" />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function CircularProgress({
-  ratio,
-  color,
-  size = 48,
+// ---------- Left-column cards ----------
+
+function LatestCard({
+  comment,
+  onOpen,
 }: {
-  ratio: number;
-  color: string;
-  size?: number;
+  comment: Comment | undefined;
+  onOpen: (id: string) => void;
 }) {
-  const clamped = Math.max(0, Math.min(1, ratio || 0));
-  const stroke = 5;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const dash = c * clamped;
+  if (!comment) {
+    return (
+      <div className="bg-white rounded-2xl border border-[color:var(--color-line)] p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+        <div className="text-xs text-[color:var(--color-ink-muted)] uppercase tracking-wider font-medium mb-2">
+          Dernier retour
+        </div>
+        <p className="text-sm text-[color:var(--color-ink-muted)]">Aucun retour pour l'instant.</p>
+      </div>
+    );
+  }
+  const date = new Date(comment.createdAt);
   return (
-    <svg width={size} height={size} className="flex-shrink-0" style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f0f0f0" strokeWidth={stroke} />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={stroke}
-        strokeDasharray={`${dash} ${c}`}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dasharray 300ms ease" }}
-      />
-    </svg>
+    <button
+      onClick={() => onOpen(comment.id)}
+      className="group w-full text-left bg-white rounded-2xl border border-[color:var(--color-line)] p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow relative overflow-hidden"
+    >
+      <div className="absolute top-3 right-3 flex flex-col items-center bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] rounded-xl px-2 py-1 text-[10px] font-semibold leading-none">
+        <span>{timeAgo(comment.createdAt).replace("il y a ", "")}</span>
+        <span className="mt-0.5 text-[10px]">Live</span>
+      </div>
+      <div className="text-xs text-[color:var(--color-ink-muted)] uppercase tracking-wider font-medium mb-2">
+        Dernier retour
+      </div>
+      <h3 className="text-sm font-semibold leading-snug line-clamp-2 mb-2 pr-14">
+        {comment.comment}
+      </h3>
+      <div className="flex items-center gap-3 text-[11px] text-[color:var(--color-ink-muted)] mb-3">
+        <span>
+          {date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+        </span>
+        <span>·</span>
+        <span>{date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+      <div className="flex items-center gap-2.5 pt-3 border-t border-[color:var(--color-line)]">
+        <div
+          className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0"
+          style={{
+            background: contributorColor(comment.contributorName || "?").bg,
+            color: contributorColor(comment.contributorName || "?").fg,
+          }}
+        >
+          {(comment.contributorName || "?")
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((s) => s[0]?.toUpperCase())
+            .join("")}
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] text-[color:var(--color-ink-muted)] leading-tight">
+            Contributeur
+          </div>
+          <div className="text-sm font-medium truncate">{comment.contributorName || "—"}</div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-1.5">
+        <span
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium"
+          style={{
+            background: `${comment.projectColor}1a`,
+            color: comment.projectColor,
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: comment.projectColor }} />
+          {comment.projectName}
+        </span>
+      </div>
+    </button>
   );
 }
+
+function SummaryCard({
+  stats,
+}: {
+  stats: { total: number; shown: number; today: number; week: number; older: number };
+}) {
+  const size = 120;
+  const stroke = 10;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const total = stats.total || 1;
+
+  // Stacked segments: today (orange), rest of this week (green), older (gray)
+  const weekOnly = Math.max(0, stats.week - stats.today);
+  const arcs = [
+    { v: stats.today, color: "#ff6b35" },
+    { v: weekOnly, color: "#4ade80" },
+    { v: stats.older, color: "#e5e5e5" },
+  ];
+
+  let offset = 0;
+  return (
+    <div className="bg-white rounded-2xl border border-[color:var(--color-line)] p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="text-sm font-semibold">Résumé</div>
+          <div className="text-xs text-[color:var(--color-ink-muted)]">
+            Répartition des retours
+          </div>
+        </div>
+        <button className="p-1 rounded-lg hover:bg-[color:var(--color-surface-2)] text-[color:var(--color-ink-muted)]">
+          <MoreHorizontal size={14} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+          <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={r}
+              fill="none"
+              stroke="#f5f5f5"
+              strokeWidth={stroke}
+            />
+            {arcs.map((arc, i) => {
+              if (arc.v === 0) return null;
+              const dash = (arc.v / total) * c;
+              const seg = (
+                <circle
+                  key={i}
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={r}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth={stroke}
+                  strokeDasharray={`${dash} ${c}`}
+                  strokeDashoffset={-offset}
+                  strokeLinecap="butt"
+                />
+              );
+              offset += dash;
+              return seg;
+            })}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="text-3xl font-semibold tracking-tight tabular-nums leading-none">
+              {stats.total}
+            </div>
+            <div className="text-[11px] text-[color:var(--color-ink-muted)] mt-0.5">retours</div>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-2 text-sm">
+          <LegendRow color="#ff6b35" value={stats.today} label="Aujourd'hui" />
+          <LegendRow color="#4ade80" value={weekOnly} label="Cette semaine" />
+          <LegendRow color="#d4d4d4" value={stats.older} label="Plus ancien" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LegendRow({
+  color,
+  value,
+  label,
+}: {
+  color: string;
+  value: number;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+      <span className="tabular-nums font-medium">{value}</span>
+      <span className="text-[color:var(--color-ink-muted)] text-[13px]">{label}</span>
+    </div>
+  );
+}
+
+function ContributorsCard({
+  items,
+  selected,
+  onToggle,
+}: {
+  items: [string, number][];
+  selected: string[];
+  onToggle: (name: string) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="bg-white rounded-2xl border border-[color:var(--color-line)] p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="text-sm font-semibold">Contributeurs</div>
+          <div className="text-xs text-[color:var(--color-ink-muted)]">
+            Clique pour filtrer
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {items.map(([name, count]) => {
+          const isSel = selected.includes(name);
+          const color = contributorColor(name);
+          return (
+            <button
+              key={name}
+              onClick={() => onToggle(name)}
+              className={cn(
+                "w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors",
+                isSel
+                  ? "bg-[color:var(--color-ink)] text-white"
+                  : "hover:bg-[color:var(--color-surface-2)]"
+              )}
+            >
+              <span
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0"
+                style={{
+                  background: isSel ? "rgba(255,255,255,0.15)" : color.bg,
+                  color: isSel ? "#fff" : color.fg,
+                }}
+              >
+                {name
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((s) => s[0]?.toUpperCase())
+                  .join("")}
+              </span>
+              <span className="text-sm font-medium flex-1 truncate">{name}</span>
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  isSel ? "text-white/70" : "text-[color:var(--color-ink-muted)]"
+                )}
+              >
+                {count}
+              </span>
+              {isSel && <Check size={14} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Pill toggle (project filter inside main panel) ----------
 
 function PillToggle({
   active,
   onClick,
   color,
   dot,
-  contributor,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   color?: string;
   dot?: boolean;
-  contributor?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -429,14 +712,15 @@ function PillToggle({
       {dot && color && (
         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
       )}
-      {contributor && <ContributorAvatar name={contributor} size={20} />}
       <span className={cn("font-medium", !active && "text-[color:var(--color-ink-muted)]")}>
         {children}
       </span>
       <span
         className={cn(
           "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors",
-          active ? "bg-[color:var(--color-ink)] text-white" : "bg-[color:var(--color-surface-2)] text-transparent"
+          active
+            ? "bg-[color:var(--color-ink)] text-white"
+            : "bg-[color:var(--color-surface-2)] text-transparent"
         )}
       >
         <Check size={12} strokeWidth={3} />
@@ -445,42 +729,11 @@ function PillToggle({
   );
 }
 
-function ViewSwitcher({ value, onChange }: { value: View; onChange: (v: View) => void }) {
-  const btn =
-    "p-2 rounded-lg transition-colors text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]";
-  const active = "!bg-[color:var(--color-ink)] !text-white hover:!text-white";
-  return (
-    <div className="flex items-center gap-0.5 bg-white border border-[color:var(--color-line)] rounded-xl p-0.5">
-      <button
-        onClick={() => onChange("grid")}
-        className={cn(btn, value === "grid" && active)}
-        title="Grille"
-      >
-        <LayoutGrid size={16} />
-      </button>
-      <button
-        onClick={() => onChange("list")}
-        className={cn(btn, value === "list" && active)}
-        title="Liste"
-      >
-        <Rows3 size={16} />
-      </button>
-      <button
-        onClick={() => onChange("board")}
-        className={cn(btn, value === "board" && active)}
-        title="Tableau"
-      >
-        <Columns3 size={16} />
-      </button>
-    </div>
-  );
-}
-
 // ---------- Views ----------
 
 function GridView({ comments, onSelect }: { comments: Comment[]; onSelect: (id: string) => void }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
       {comments.map((c) => (
         <CardFull key={c.id} c={c} onSelect={onSelect} />
       ))}
@@ -490,7 +743,7 @@ function GridView({ comments, onSelect }: { comments: Comment[]; onSelect: (id: 
 
 function ListView({ comments, onSelect }: { comments: Comment[]; onSelect: (id: string) => void }) {
   return (
-    <div className="bg-white rounded-2xl border border-[color:var(--color-line)] overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+    <div className="rounded-xl border border-[color:var(--color-line)] overflow-hidden">
       {comments.map((c, i) => (
         <RowItem
           key={c.id}
@@ -537,13 +790,13 @@ function BoardView({
     <div>
       <div className="flex items-center justify-end gap-2 mb-3">
         <span className="text-xs text-[color:var(--color-ink-muted)]">Grouper par</span>
-        <div className="flex items-center gap-0.5 bg-white border border-[color:var(--color-line)] rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 bg-[color:var(--color-surface-2)] rounded-lg p-0.5">
           <button
             onClick={() => onGroupChange("project")}
             className={cn(
               "px-3 py-1 rounded-md text-xs transition-colors",
               groupBy === "project"
-                ? "bg-[color:var(--color-ink)] text-white"
+                ? "bg-white text-[color:var(--color-ink)] shadow-sm"
                 : "text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
             )}
           >
@@ -554,7 +807,7 @@ function BoardView({
             className={cn(
               "px-3 py-1 rounded-md text-xs transition-colors",
               groupBy === "contributor"
-                ? "bg-[color:var(--color-ink)] text-white"
+                ? "bg-white text-[color:var(--color-ink)] shadow-sm"
                 : "text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)]"
             )}
           >
@@ -563,13 +816,13 @@ function BoardView({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
         {columns
           .filter((col) => col.items.length > 0)
           .map((col) => (
             <div
               key={col.key}
-              className="bg-[color:var(--color-surface-2)] rounded-2xl p-3"
+              className="bg-[color:var(--color-surface-2)] rounded-xl p-3"
             >
               <div className="flex items-center justify-between px-1 mb-3">
                 <div className="flex items-center gap-2">
@@ -583,7 +836,7 @@ function BoardView({
                   {col.items.length}
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {col.items.map((c) => (
                   <CardCompact key={c.id} c={c} onSelect={onSelect} />
                 ))}
@@ -661,8 +914,8 @@ function CardFull({ c, onSelect }: { c: Comment; onSelect: (id: string) => void 
       onClick={() => onSelect(c.id)}
       className="group text-left bg-white border border-[color:var(--color-line)] rounded-2xl overflow-hidden hover:shadow-md hover:border-[color:var(--color-ink)]/10 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
     >
-      <div className="p-3 pb-0">
-        <ScreenshotThumb c={c} heightClass="h-52" />
+      <div className="p-2.5 pb-0">
+        <ScreenshotThumb c={c} heightClass="h-44" />
       </div>
       <div className="p-4 pt-3">
         <div className="flex items-center gap-2 mb-2">
@@ -688,10 +941,6 @@ function CardFull({ c, onSelect }: { c: Comment; onSelect: (id: string) => void 
         <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] flex items-center gap-2">
           <ContributorAvatar name={c.contributorName} size={24} />
           <span className="text-xs font-medium truncate">{c.contributorName || "—"}</span>
-          <span className="text-[color:var(--color-ink-muted)] text-xs">·</span>
-          <span className="text-xs text-[color:var(--color-ink-muted)] truncate font-mono">
-            {shortUrl(c.url)}
-          </span>
         </div>
       </div>
     </button>
@@ -705,7 +954,7 @@ function CardCompact({ c, onSelect }: { c: Comment; onSelect: (id: string) => vo
       className="group w-full text-left bg-white border border-[color:var(--color-line)] rounded-xl overflow-hidden hover:shadow-sm hover:border-[color:var(--color-ink)]/20 transition-all"
     >
       <div className="p-2">
-        <ScreenshotThumb c={c} heightClass="h-28" />
+        <ScreenshotThumb c={c} heightClass="h-24" />
       </div>
       <div className="px-3 pb-3">
         <p className="text-sm leading-snug line-clamp-2 text-[color:var(--color-ink)]">{c.comment}</p>
@@ -736,12 +985,12 @@ function RowItem({
     <button
       onClick={() => onSelect(c.id)}
       className={cn(
-        "group w-full text-left px-4 py-3 flex items-start gap-4 hover:bg-[color:var(--color-surface-2)] transition-colors",
+        "group w-full text-left px-4 py-3 flex items-start gap-4 hover:bg-[color:var(--color-surface-2)] transition-colors bg-white",
         !last && "border-b border-[color:var(--color-line)]"
       )}
     >
       <div
-        className="flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden border border-[color:var(--color-line)]"
+        className="flex-shrink-0 w-28 h-20 rounded-lg overflow-hidden border border-[color:var(--color-line)]"
         style={{
           background:
             "repeating-conic-gradient(#f4f4f4 0% 25%, #fafafa 0% 50%) 50% / 12px 12px",
@@ -791,7 +1040,7 @@ function RowItem({
 function EmptyResults({ hasFilters, orgSlug }: { hasFilters: boolean; orgSlug: string }) {
   if (hasFilters) {
     return (
-      <div className="bg-white border border-[color:var(--color-line)] rounded-2xl p-16 text-center">
+      <div className="p-16 text-center">
         <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[color:var(--color-surface-2)] flex items-center justify-center text-[color:var(--color-ink-muted)]">
           <Filter size={18} />
         </div>
@@ -803,7 +1052,7 @@ function EmptyResults({ hasFilters, orgSlug }: { hasFilters: boolean; orgSlug: s
     );
   }
   return (
-    <div className="bg-white border border-[color:var(--color-line)] rounded-2xl p-16 text-center">
+    <div className="p-16 text-center">
       <h3 className="text-lg font-medium mb-2">Aucun retour pour l'instant</h3>
       <p className="text-sm text-[color:var(--color-ink-muted)] max-w-sm mx-auto mb-6">
         Lance une session dans l'extension et commente un élément — les retours apparaîtront ici.
