@@ -40,10 +40,10 @@ async function ffMatchProjects(url) {
   return ffApi(`/api/v1/projects/match?url=${encodeURIComponent(url)}`);
 }
 
-async function ffCreateSession({ projectId, startUrl, startTitle, title }) {
+async function ffCreateSession({ projectId, startUrl, startTitle, title, contributorName }) {
   return ffApi("/api/v1/sessions", {
     method: "POST",
-    body: { projectId, startUrl, startTitle, title },
+    body: { projectId, startUrl, startTitle, title, contributorName },
   });
 }
 

@@ -151,6 +151,7 @@ export const feedbackSession = pgTable("feedback_session", {
   authorId: text("author_id")
     .notNull()
     .references(() => user.id, { onDelete: "set null" }),
+  contributorName: text("contributor_name"),
   title: text("title"),
   startUrl: text("start_url"),
   startTitle: text("start_title"),

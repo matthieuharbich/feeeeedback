@@ -75,6 +75,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           projectName: meta.projectName || null,
           projectColor: meta.projectColor || null,
           cloudSessionId: meta.cloudSessionId || null,
+          contributorName: meta.contributorName || null,
         };
         await setSession(session);
         if (tab?.id) await sendToTab(tab.id, { type: "FF_ACTIVATE" });
@@ -104,6 +105,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           projectName: null,
           projectColor: null,
           cloudSessionId: null,
+          contributorName: null,
         });
         const tab = await getActiveTab();
         if (tab?.id) await sendToTab(tab.id, { type: "FF_DEACTIVATE" });

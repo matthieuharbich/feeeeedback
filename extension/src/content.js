@@ -342,10 +342,14 @@
     }
     ensureWidget();
 
-    const modeBadge =
+    const projectBadge =
       sessionMeta?.mode === "cloud" && sessionMeta.projectName
         ? `<span class="ff-mode-badge" style="background:${sessionMeta.projectColor || "#ff6b35"}">${escapeHtml(sessionMeta.projectName)}</span>`
         : `<span class="ff-mode-badge ff-mode-local">Local</span>`;
+    const contributorBadge = sessionMeta?.contributorName
+      ? `<span class="ff-mode-badge ff-mode-contrib">${escapeHtml(sessionMeta.contributorName)}</span>`
+      : "";
+    const modeBadge = `${projectBadge}${contributorBadge}`;
 
     widgetEl.innerHTML = `
       <div class="ff-widget-header" data-ff-drag>
@@ -511,6 +515,7 @@
           projectName: session.projectName || null,
           projectColor: session.projectColor || null,
           cloudSessionId: session.cloudSessionId || null,
+          contributorName: session.contributorName || null,
         }
       : null;
     widgetPos = posRes?.[POS_KEY] || null;

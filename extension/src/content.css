@@ -96,6 +96,13 @@
   color: #888 !important;
 }
 
+.ff-mode-badge.ff-mode-contrib {
+  background: #1a1a1a !important;
+  color: #bbb !important;
+  border: 1px solid #333 !important;
+  margin-left: 4px !important;
+}
+
 .ff-dot {
   width: 8px !important;
   height: 8px !important;

@@ -1,0 +1,1 @@
+ALTER TABLE "feedback_session" ADD COLUMN "contributor_name" text;

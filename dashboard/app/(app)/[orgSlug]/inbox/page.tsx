@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { comment, feedbackSession, project, user } from "@/lib/db/schema";
+import { sql } from "drizzle-orm";
 import { requireSession, getOrgBySlug } from "@/lib/server/session";
 import { Avatar } from "@/components/avatar";
 import { EmptyState } from "@/components/empty-state";
@@ -58,6 +59,7 @@ export default async function InboxPage({
       projectName: project.name,
       projectColor: project.color,
       projectSlug: project.slug,
+      contributorName: sql<string | null>`COALESCE(${feedbackSession.contributorName}, ${user.name})`,
       authorId: user.id,
       authorName: user.name,
       authorEmail: user.email,
@@ -65,7 +67,8 @@ export default async function InboxPage({
     })
     .from(comment)
     .innerJoin(project, eq(comment.projectId, project.id))
-    .innerJoin(user, eq(comment.authorId, user.id));
+    .innerJoin(user, eq(comment.authorId, user.id))
+    .leftJoin(feedbackSession, eq(comment.sessionId, feedbackSession.id));
 
   const rows = await commentsBase
     .where(
@@ -154,8 +157,15 @@ export default async function InboxPage({
                 </div>
                 <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Avatar name={r.authorName} email={r.authorEmail} image={r.authorImage} size={20} />
-                    <span className="text-xs text-[color:var(--color-ink-muted)] truncate">{r.authorName}</span>
+                    <Avatar
+                      name={r.contributorName || r.authorName}
+                      email={r.authorEmail}
+                      image={r.authorImage}
+                      size={20}
+                    />
+                    <span className="text-xs text-[color:var(--color-ink-muted)] truncate">
+                      {r.contributorName || r.authorName}
+                    </span>
                   </div>
                   <span className="text-xs text-[color:var(--color-ink-muted)]">{formatDate(r.createdAt)}</span>
                 </div>

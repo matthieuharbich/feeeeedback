@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 function LoginForm() {
+  const router = useRouter();
   const params = useSearchParams();
-  const redirect = params.get("redirect") || "/app";
+  const redirect = params.get("redirect") || "/";
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"magic" | "password">("magic");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,12 +21,23 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
-      const { error: err } = await authClient.signIn.magicLink({
-        email,
-        callbackURL: redirect,
-      });
-      if (err) throw new Error(err.message || "Erreur");
-      setSent(true);
+      if (mode === "password") {
+        const { error: err } = await authClient.signIn.email({
+          email,
+          password,
+          callbackURL: redirect,
+        });
+        if (err) throw new Error(err.message || "Identifiants incorrects");
+        router.push(redirect);
+        router.refresh();
+      } else {
+        const { error: err } = await authClient.signIn.magicLink({
+          email,
+          callbackURL: redirect,
+        });
+        if (err) throw new Error(err.message || "Erreur");
+        setSent(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
@@ -61,7 +75,7 @@ function LoginForm() {
     <>
       <h1 className="text-2xl font-semibold tracking-tight text-center mb-1">Se connecter</h1>
       <p className="text-sm text-[color:var(--color-ink-muted)] text-center mb-8">
-        On t'envoie un lien magique pour te connecter.
+        {mode === "password" ? "Email + mot de passe." : "On t'envoie un lien magique pour te connecter."}
       </p>
 
       <form onSubmit={onSubmit} className="space-y-3">
@@ -74,15 +88,39 @@ function LoginForm() {
           className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm"
           autoFocus
         />
+        {mode === "password" && (
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Mot de passe"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--color-line)] focus:border-[color:var(--color-accent)] focus:outline-none focus:ring-3 focus:ring-[color:var(--color-accent)]/15 text-sm"
+          />
+        )}
         <button
           type="submit"
-          disabled={loading || !email}
+          disabled={loading || !email || (mode === "password" && !password)}
           className="w-full px-3.5 py-2.5 rounded-xl bg-[color:var(--color-accent)] hover:bg-[color:var(--color-accent-hover)] text-white text-sm font-medium disabled:opacity-50 transition-colors"
         >
-          {loading ? "Envoi…" : "M'envoyer le lien"}
+          {loading ? "…" : mode === "password" ? "Se connecter" : "M'envoyer le lien"}
         </button>
         {error && <p className="text-sm text-red-600 text-center">{error}</p>}
       </form>
+
+      <div className="mt-6 text-center">
+        <button
+          type="button"
+          onClick={() => {
+            setMode(mode === "password" ? "magic" : "password");
+            setError(null);
+            setPassword("");
+          }}
+          className="text-xs text-[color:var(--color-ink-muted)] hover:text-[color:var(--color-ink)] underline"
+        >
+          {mode === "password" ? "Utiliser un lien magique à la place" : "J'ai un mot de passe"}
+        </button>
+      </div>
     </>
   );
 }

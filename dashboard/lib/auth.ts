@@ -23,6 +23,11 @@ export const auth = betterAuth({
   }),
   baseURL: appUrl,
   secret: process.env.BETTER_AUTH_SECRET,
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+    minPasswordLength: 8,
+  },
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {

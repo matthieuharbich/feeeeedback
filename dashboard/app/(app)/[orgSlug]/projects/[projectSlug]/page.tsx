@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { comment, project, user } from "@/lib/db/schema";
+import { comment, feedbackSession, project, user } from "@/lib/db/schema";
+import { sql } from "drizzle-orm";
 import { requireSession, getOrgBySlug } from "@/lib/server/session";
 import { Avatar } from "@/components/avatar";
 import { EmptyState } from "@/components/empty-state";
@@ -32,12 +33,14 @@ export default async function ProjectPage({
       url: comment.url,
       screenshotPath: comment.screenshotPath,
       createdAt: comment.createdAt,
+      contributorName: sql<string | null>`COALESCE(${feedbackSession.contributorName}, ${user.name})`,
       authorName: user.name,
       authorEmail: user.email,
       authorImage: user.image,
     })
     .from(comment)
     .innerJoin(user, eq(comment.authorId, user.id))
+    .leftJoin(feedbackSession, eq(comment.sessionId, feedbackSession.id))
     .where(eq(comment.projectId, proj[0].id))
     .orderBy(desc(comment.createdAt))
     .limit(100);
@@ -94,8 +97,15 @@ export default async function ProjectPage({
                 <div className="mt-3 text-xs text-[color:var(--color-ink-muted)] truncate">{shortUrl(r.url)}</div>
                 <div className="mt-3 pt-3 border-t border-[color:var(--color-line)] flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Avatar name={r.authorName} email={r.authorEmail} image={r.authorImage} size={20} />
-                    <span className="text-xs text-[color:var(--color-ink-muted)] truncate">{r.authorName}</span>
+                    <Avatar
+                      name={r.contributorName || r.authorName}
+                      email={r.authorEmail}
+                      image={r.authorImage}
+                      size={20}
+                    />
+                    <span className="text-xs text-[color:var(--color-ink-muted)] truncate">
+                      {r.contributorName || r.authorName}
+                    </span>
                   </div>
                   <span className="text-xs text-[color:var(--color-ink-muted)]">{formatDate(r.createdAt)}</span>
                 </div>

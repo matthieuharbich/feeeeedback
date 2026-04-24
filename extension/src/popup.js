@@ -1,6 +1,8 @@
-// feeeeedback — popup (simplified auth flow)
+// feeeeedback — popup (simplified auth + project + contributor)
 
 const API_BASE = "https://feeeeedback.mtth.world";
+const CONTRIB_KEY = "ff_contributor";
+const CONTRIB_DEFAULTS = ["Nicolas", "Juliane", "Damien", "Tony"];
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,11 +24,14 @@ const els = {
   userEmail: $("userEmail"),
   tabUrl: $("tabUrl"),
   projectSelect: $("projectSelect"),
+  contributorSelect: $("contributorSelect"),
+  contributorCustom: $("contributorCustom"),
   sessionActions: $("sessionActions"),
   toggleBtn: $("toggleBtn"),
   meta: $("meta"),
   count: $("count"),
   projectLabel: $("projectLabel"),
+  contributorLabel: $("contributorLabel"),
   extraActions: $("extraActions"),
   copyBtn: $("copyBtn"),
   dashBtn: $("dashBtn"),
@@ -39,11 +44,13 @@ let currentTab = null;
 let matchedProjects = [];
 let allProjects = [];
 let pendingEmail = null;
+let savedContributor = null; // { kind: "preset" | "custom", value: "Nicolas" }
 
 async function init() {
   auth = await ffGetAuth();
   session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
   [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  savedContributor = await loadContributor();
 
   if (auth && currentTab?.url) {
     try {
@@ -55,10 +62,39 @@ async function init() {
     }
   }
   render();
+  applyContributorToUI();
   listenForAuth();
 }
 
-// Live-update when bridge.js stores new auth
+async function loadContributor() {
+  const { [CONTRIB_KEY]: c } = await chrome.storage.local.get(CONTRIB_KEY);
+  return c || { kind: "preset", value: CONTRIB_DEFAULTS[0] };
+}
+
+async function saveContributor(c) {
+  await chrome.storage.local.set({ [CONTRIB_KEY]: c });
+  savedContributor = c;
+}
+
+function currentContributorName() {
+  if (savedContributor?.kind === "custom") return (savedContributor.value || "").trim() || null;
+  return savedContributor?.value || null;
+}
+
+function applyContributorToUI() {
+  if (!els.contributorSelect || !savedContributor) return;
+  if (savedContributor.kind === "custom") {
+    els.contributorSelect.value = "__other__";
+    els.contributorCustom.style.display = "";
+    els.contributorCustom.value = savedContributor.value || "";
+  } else {
+    els.contributorSelect.value = CONTRIB_DEFAULTS.includes(savedContributor.value)
+      ? savedContributor.value
+      : CONTRIB_DEFAULTS[0];
+    els.contributorCustom.style.display = "none";
+  }
+}
+
 function listenForAuth() {
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== "local" || !changes.ff_auth) return;
@@ -71,6 +107,7 @@ function listenForAuth() {
       } catch {}
     }
     render();
+    applyContributorToUI();
   });
 }
 
@@ -97,7 +134,7 @@ function render() {
 
     const optNone = document.createElement("option");
     optNone.value = "";
-    optNone.textContent = "— Local (pas de sync) —";
+    optNone.textContent = "— Local (copier JSON) —";
     select.appendChild(optNone);
 
     if (matchedProjects.length) {
@@ -135,6 +172,7 @@ function render() {
   if (active) {
     els.count.textContent = (session?.items || []).length;
     els.projectLabel.textContent = session?.projectName || "Local";
+    els.contributorLabel.textContent = session?.contributorName || "—";
     els.dashBtn.hidden = !(session?.mode === "cloud" && auth?.apiUrl);
   }
 
@@ -191,7 +229,11 @@ els.backBtn?.addEventListener("click", () => {
 });
 
 els.localStartBtn?.addEventListener("click", async () => {
-  await chrome.runtime.sendMessage({ type: "START_SESSION", meta: {} });
+  const contributorName = currentContributorName();
+  await chrome.runtime.sendMessage({
+    type: "START_SESSION",
+    meta: { contributorName },
+  });
   window.close();
 });
 
@@ -202,6 +244,23 @@ els.signOutBtn?.addEventListener("click", async () => {
   render();
 });
 
+els.contributorSelect?.addEventListener("change", async () => {
+  const v = els.contributorSelect.value;
+  if (v === "__other__") {
+    els.contributorCustom.style.display = "";
+    els.contributorCustom.focus();
+    await saveContributor({ kind: "custom", value: els.contributorCustom.value || "" });
+  } else {
+    els.contributorCustom.style.display = "none";
+    await saveContributor({ kind: "preset", value: v });
+  }
+});
+
+els.contributorCustom?.addEventListener("input", async () => {
+  if (els.contributorSelect.value !== "__other__") return;
+  await saveContributor({ kind: "custom", value: els.contributorCustom.value || "" });
+});
+
 els.toggleBtn?.addEventListener("click", async () => {
   if (session?.active) {
     await chrome.runtime.sendMessage({ type: "STOP_SESSION" });
@@ -210,8 +269,14 @@ els.toggleBtn?.addEventListener("click", async () => {
     return;
   }
 
+  const contributorName = currentContributorName();
+  if (!contributorName) {
+    alert("Sélectionne ou entre un prénom pour attribuer les retours.");
+    return;
+  }
+
   const projectId = els.projectSelect.value;
-  let meta = {};
+  let meta = { contributorName };
   if (projectId && auth) {
     const proj = [...matchedProjects, ...allProjects].find((p) => p.id === projectId);
     try {
@@ -219,8 +284,10 @@ els.toggleBtn?.addEventListener("click", async () => {
         projectId,
         startUrl: currentTab?.url,
         startTitle: currentTab?.title,
+        contributorName,
       });
       meta = {
+        contributorName,
         projectId,
         projectName: proj?.name,
         projectColor: proj?.color,

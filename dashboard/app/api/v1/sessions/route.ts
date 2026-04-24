@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   if (ctx instanceof Response) return ctx;
 
   const body = await req.json();
-  const { projectId, title, startUrl, startTitle } = body || {};
+  const { projectId, title, startUrl, startTitle, contributorName } = body || {};
   if (!projectId) return json({ error: "projectId required" }, 400);
 
   const projRows = await db.select().from(project).where(eq(project.id, projectId)).limit(1);
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     id,
     projectId,
     authorId: ctx.user.id,
+    contributorName: (contributorName || "").toString().trim() || null,
     title: title || null,
     startUrl: startUrl || null,
     startTitle: startTitle || null,

@@ -59,6 +59,24 @@
         <select id="projectSelect" class="select"></select>
       </div>
 
+      <div class="field">
+        <label>Qui donne le feedback ?</label>
+        <select id="contributorSelect" class="select">
+          <option value="Nicolas">Nicolas</option>
+          <option value="Juliane">Juliane</option>
+          <option value="Damien">Damien</option>
+          <option value="Tony">Tony</option>
+          <option value="__other__">Autre…</option>
+        </select>
+        <input
+          id="contributorCustom"
+          type="text"
+          placeholder="Prénom"
+          class="input"
+          style="margin-top: 6px; display: none;"
+        />
+      </div>
+
       <div class="page-url">
         <span>Page :</span>
         <span id="tabUrl">—</span>
@@ -72,6 +90,7 @@
     <section class="meta" id="meta" hidden>
       <div><span>Éléments :</span> <span id="count">0</span></div>
       <div><span>Projet :</span> <span id="projectLabel">Local</span></div>
+      <div><span>Auteur :</span> <span id="contributorLabel">—</span></div>
     </section>
 
     <section class="actions" id="extraActions" hidden>
