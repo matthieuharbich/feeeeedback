@@ -40,14 +40,12 @@ export default async function Home() {
             >
               Commencer
             </Link>
-            <a
-              href="https://github.com/matthieuharbich/feeeeedback"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              href="/install"
               className="px-6 py-3 rounded-xl font-medium text-sm text-[color:var(--color-ink)] hover:bg-[color:var(--color-surface-2)] transition-colors"
             >
               Installer l'extension →
-            </a>
+            </Link>
           </div>
         </div>
       </section>

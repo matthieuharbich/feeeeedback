@@ -23,5 +23,6 @@ dashboard/uploads/
 # drizzle artifacts
 dashboard/drizzle/meta/_journal.json.lock
 
-# packaged extension ZIPs
-feeeeedback-extension-*.zip
+# packaged extension ZIPs at repo root (versioned, for Web Store upload)
+/feeeeedback-extension-*.zip
+# dashboard/public/feeeeedback-extension.zip IS committed (served at /install)
