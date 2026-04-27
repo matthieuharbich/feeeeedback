@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "feeeeedback",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Capture des retours visuels sur sites live — sélection d'éléments, commentaires, screenshots, sync vers le dashboard feeeeedback.",
   "homepage_url": "https://feeeeedback.mtth.world",
   "author": "Matthieu Harbich",

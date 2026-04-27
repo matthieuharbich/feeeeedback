@@ -287,10 +287,29 @@
     ui.forEach((el) => {
       el.style.visibility = "hidden";
     });
+
+    // Strip ALL feeeeedback outline markers from any element that has them
+    // (clicked target with .ff-marked, hovered target with .ff-outline-hover).
+    // We track which classes were present so we can restore exactly.
     const marked = Array.from(
       document.querySelectorAll("." + MARKED_CLASS + ", ." + OUTLINE_CLASS)
     );
-    marked.forEach((el) => el.classList.add("ff-capture-hide-outline"));
+    const markedState = marked.map((el) => ({
+      hadMarked: el.classList.contains(MARKED_CLASS),
+      hadOutline: el.classList.contains(OUTLINE_CLASS),
+      prevOutline: el.style.outline,
+      prevOutlineOffset: el.style.outlineOffset,
+      prevBoxShadow: el.style.boxShadow,
+    }));
+    marked.forEach((el) => {
+      el.classList.remove(MARKED_CLASS);
+      el.classList.remove(OUTLINE_CLASS);
+      // Belt & suspenders: also override inline in case some site CSS adds
+      // its own focus/hover outline that's still ours.
+      el.style.setProperty("outline", "none", "important");
+      el.style.setProperty("outline-offset", "0", "important");
+      el.style.setProperty("box-shadow", "none", "important");
+    });
 
     const restore = () => {
       ui.forEach((el, i) => {
@@ -298,7 +317,19 @@
         if (v) el.style.visibility = v;
         else el.style.removeProperty("visibility");
       });
-      marked.forEach((el) => el.classList.remove("ff-capture-hide-outline"));
+      marked.forEach((el, i) => {
+        const s = markedState[i];
+        // restore inline styles
+        if (s.prevOutline) el.style.outline = s.prevOutline;
+        else el.style.removeProperty("outline");
+        if (s.prevOutlineOffset) el.style.outlineOffset = s.prevOutlineOffset;
+        else el.style.removeProperty("outline-offset");
+        if (s.prevBoxShadow) el.style.boxShadow = s.prevBoxShadow;
+        else el.style.removeProperty("box-shadow");
+        // restore classes
+        if (s.hadMarked) el.classList.add(MARKED_CLASS);
+        if (s.hadOutline) el.classList.add(OUTLINE_CLASS);
+      });
     };
 
     // Hard fallback: if anything kills this code path mid-capture, ensure UI
