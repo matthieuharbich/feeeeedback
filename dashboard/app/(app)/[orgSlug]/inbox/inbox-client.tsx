@@ -13,12 +13,14 @@ import {
   Check,
   Inbox,
   Filter,
+  ClipboardCheck,
 } from "lucide-react";
-import { cn, contributorColor, formatDate, shortUrl, timeAgo, dayKey } from "@/lib/utils";
+import { cn, formatDate, shortUrl, timeAgo, dayKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Sheet,
   SheetContent,
@@ -153,6 +155,41 @@ export function InboxClient({
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? filtered.find((c) => c.id === activeId) || null : null;
+
+  // Multi-select state for "copy as JSON" workflow
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+
+  function selectAllFiltered() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      filtered.forEach((c) => next.add(c.id));
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+  }
+
+  function deselectAllFiltered() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      filtered.forEach((c) => next.delete(c.id));
+      return next;
+    });
+  }
 
   const hasFilters =
     !!qParam || projectsSel.length > 0 || contributorsSel.length > 0;
@@ -291,10 +328,29 @@ export function InboxClient({
       {filtered.length === 0 ? (
         <EmptyInbox hasFilters={hasFilters} orgSlug={orgSlug} />
       ) : viewParam === "list" ? (
-        <ListView comments={filtered} onSelect={setActiveId} />
+        <ListView
+          comments={filtered}
+          onSelect={setActiveId}
+          selected={selected}
+          onToggleSelected={toggleSelected}
+        />
       ) : (
-        <GridView comments={filtered} onSelect={setActiveId} />
+        <GridView
+          comments={filtered}
+          onSelect={setActiveId}
+          selected={selected}
+          onToggleSelected={toggleSelected}
+        />
       )}
+
+      <SelectionBar
+        comments={comments}
+        selected={selected}
+        allFilteredSelected={allFilteredSelected}
+        onSelectAll={selectAllFiltered}
+        onDeselectAll={deselectAllFiltered}
+        onClear={clearSelection}
+      />
 
       <Sheet
         open={!!active}
@@ -332,14 +388,24 @@ function FilterRow({
 function GridView({
   comments,
   onSelect,
+  selected,
+  onToggleSelected,
 }: {
   comments: Comment[];
   onSelect: (id: string) => void;
+  selected: Set<string>;
+  onToggleSelected: (id: string) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {comments.map((c) => (
-        <CommentCard key={c.id} c={c} onSelect={onSelect} />
+        <CommentCard
+          key={c.id}
+          c={c}
+          onSelect={onSelect}
+          checked={selected.has(c.id)}
+          onCheckedChange={() => onToggleSelected(c.id)}
+        />
       ))}
     </div>
   );
@@ -348,40 +414,61 @@ function GridView({
 function ListView({
   comments,
   onSelect,
+  selected,
+  onToggleSelected,
 }: {
   comments: Comment[];
   onSelect: (id: string) => void;
+  selected: Set<string>;
+  onToggleSelected: (id: string) => void;
 }) {
   return (
     <Card className="overflow-hidden p-0">
-      {comments.map((c, i) => (
-        <button
-          key={c.id}
-          onClick={() => onSelect(c.id)}
-          className={cn(
-            "w-full text-left px-4 py-3 flex items-start gap-4 hover:bg-muted/60 transition-colors",
-            i !== comments.length - 1 && "border-b"
-          )}
-        >
-          <Thumb c={c} size="sm" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <ContributorAvatar name={c.contributorName} size={20} />
-              <span className="text-sm font-medium truncate">
-                {c.contributorName || "—"}
-              </span>
-              <ProjectBadge c={c} />
-              <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-                {timeAgo(c.createdAt)}
-              </span>
+      {comments.map((c, i) => {
+        const checked = selected.has(c.id);
+        return (
+          <div
+            key={c.id}
+            className={cn(
+              "px-4 py-3 flex items-start gap-3 hover:bg-muted/60 transition-colors",
+              i !== comments.length - 1 && "border-b",
+              checked && "bg-primary/5"
+            )}
+          >
+            <div className="pt-1.5">
+              <Checkbox
+                checked={checked}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelected(c.id);
+                }}
+              />
             </div>
-            <p className="text-sm leading-relaxed line-clamp-2">{c.comment}</p>
-            <div className="mt-1 text-xs text-muted-foreground truncate font-mono">
-              {shortUrl(c.url)}
-            </div>
+            <button
+              onClick={() => onSelect(c.id)}
+              className="flex-1 min-w-0 flex items-start gap-4 text-left"
+            >
+              <Thumb c={c} size="sm" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <ContributorAvatar name={c.contributorName} size={20} />
+                  <span className="text-sm font-medium truncate">
+                    {c.contributorName || "—"}
+                  </span>
+                  <ProjectBadge c={c} />
+                  <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
+                    {timeAgo(c.createdAt)}
+                  </span>
+                </div>
+                <p className="text-sm leading-relaxed line-clamp-2">{c.comment}</p>
+                <div className="mt-1 text-xs text-muted-foreground truncate font-mono">
+                  {shortUrl(c.url)}
+                </div>
+              </div>
+            </button>
           </div>
-        </button>
-      ))}
+        );
+      })}
     </Card>
   );
 }
@@ -389,16 +476,35 @@ function ListView({
 function CommentCard({
   c,
   onSelect,
+  checked,
+  onCheckedChange,
 }: {
   c: Comment;
   onSelect: (id: string) => void;
+  checked: boolean;
+  onCheckedChange: () => void;
 }) {
   return (
-    <button
-      onClick={() => onSelect(c.id)}
-      className="group text-left"
+    <Card
+      className={cn(
+        "overflow-hidden hover:shadow-md hover:border-foreground/10 transition-all p-0 gap-0 relative",
+        checked && "ring-2 ring-primary"
+      )}
     >
-      <Card className="overflow-hidden hover:shadow-md hover:border-foreground/10 transition-all p-0 gap-0">
+      <div
+        className={cn(
+          "absolute top-3 left-3 z-10 transition-opacity",
+          checked ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"
+        )}
+      >
+        <div className="bg-background/95 backdrop-blur rounded-md p-1 shadow-sm border">
+          <Checkbox checked={checked} onClick={onCheckedChange} />
+        </div>
+      </div>
+      <button
+        onClick={() => onSelect(c.id)}
+        className="group/card text-left w-full"
+      >
         <div className="p-2 pb-0">
           <Thumb c={c} />
         </div>
@@ -417,8 +523,111 @@ function CommentCard({
             </span>
           </div>
         </CardContent>
-      </Card>
-    </button>
+      </button>
+    </Card>
+  );
+}
+
+// ---------- JSON export + selection bar ----------
+
+function buildJsonExport(comments: Comment[]) {
+  return {
+    tool: "feeeeedback",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    count: comments.length,
+    items: comments.map((c) => ({
+      comment: c.comment,
+      from: c.contributorName || null,
+      project: c.projectName,
+      page: {
+        url: c.url,
+        title: c.pageTitle || null,
+        viewport:
+          c.viewportWidth && c.viewportHeight
+            ? { width: c.viewportWidth, height: c.viewportHeight }
+            : null,
+      },
+      element: {
+        selector: c.selector,
+        tag: c.tagName || null,
+        text: c.text || null,
+      },
+      createdAt: c.createdAt,
+    })),
+  };
+}
+
+function SelectionBar({
+  comments,
+  selected,
+  allFilteredSelected,
+  onSelectAll,
+  onDeselectAll,
+  onClear,
+}: {
+  comments: Comment[];
+  selected: Set<string>;
+  allFilteredSelected: boolean;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+  onClear: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (selected.size === 0) return null;
+
+  const selectedComments = comments.filter((c) => selected.has(c.id));
+
+  async function copyJson() {
+    const payload = buildJsonExport(selectedComments);
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
+      <div className="bg-foreground text-background rounded-xl shadow-2xl px-2 py-2 flex items-center gap-1">
+        <span className="px-3 text-sm font-medium tabular-nums">
+          {selected.size} sélectionné{selected.size > 1 ? "s" : ""}
+        </span>
+        <span className="w-px h-5 bg-background/20" />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-background hover:bg-background/10 hover:text-background"
+          onClick={allFilteredSelected ? onDeselectAll : onSelectAll}
+        >
+          {allFilteredSelected ? "Désélectionner la vue" : "Sélectionner la vue"}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-background hover:bg-background/10 hover:text-background"
+          onClick={onClear}
+        >
+          Effacer
+        </Button>
+        <span className="w-px h-5 bg-background/20" />
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={copyJson}
+          className="bg-background text-foreground hover:bg-background/90"
+        >
+          {copied ? (
+            <>
+              <ClipboardCheck className="size-3.5" /> Copié pour Claude
+            </>
+          ) : (
+            <>
+              <Copy className="size-3.5" /> Copier en JSON
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
   );
 }
 

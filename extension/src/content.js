@@ -282,17 +282,29 @@
 
   async function captureAndCrop(viewRect) {
     // Hide our own UI before capturing so it does not end up in the screenshot.
-    const ui = document.querySelectorAll(".ff-panel, .ff-widget, .ff-banner");
-    const prevVisibility = [];
+    const ui = Array.from(document.querySelectorAll(".ff-panel, .ff-widget, .ff-banner"));
+    const prevVisibility = ui.map((el) => el.style.visibility);
     ui.forEach((el) => {
-      prevVisibility.push(el.style.visibility);
       el.style.visibility = "hidden";
     });
-    // Also drop any hover outline on the target element during capture.
-    const marked = document.querySelectorAll("." + MARKED_CLASS + ", ." + OUTLINE_CLASS);
+    const marked = Array.from(
+      document.querySelectorAll("." + MARKED_CLASS + ", ." + OUTLINE_CLASS)
+    );
     marked.forEach((el) => el.classList.add("ff-capture-hide-outline"));
 
-    // Wait two animation frames so the browser paints without our UI.
+    const restore = () => {
+      ui.forEach((el, i) => {
+        const v = prevVisibility[i];
+        if (v) el.style.visibility = v;
+        else el.style.removeProperty("visibility");
+      });
+      marked.forEach((el) => el.classList.remove("ff-capture-hide-outline"));
+    };
+
+    // Hard fallback: if anything kills this code path mid-capture, ensure UI
+    // is restored within 4 s no matter what.
+    const safetyTimeout = setTimeout(restore, 4000);
+
     await new Promise((r) =>
       requestAnimationFrame(() => requestAnimationFrame(r))
     );
@@ -301,10 +313,8 @@
     try {
       res = await chrome.runtime.sendMessage({ type: "FF_CAPTURE_TAB" });
     } finally {
-      ui.forEach((el, i) => {
-        el.style.visibility = prevVisibility[i] || "";
-      });
-      marked.forEach((el) => el.classList.remove("ff-capture-hide-outline"));
+      clearTimeout(safetyTimeout);
+      restore();
     }
     if (!res?.dataUrl) throw new Error(res?.error || "capture failed");
     const img = new Image();
@@ -327,11 +337,39 @@
 
   // --- widget ----------------------------------------------------------------
   function ensureWidget() {
-    if (widgetEl) return;
+    if (widgetEl && widgetEl.isConnected) return;
     widgetEl = document.createElement("div");
     widgetEl.className = "ff-widget";
     document.documentElement.appendChild(widgetEl);
     applyWidgetPosition();
+  }
+
+  // Watch the document for SPA navigations that might wipe our widget.
+  let widgetWatcher = null;
+  function startWidgetWatcher() {
+    if (widgetWatcher) return;
+    widgetWatcher = new MutationObserver(() => {
+      if (sessionActive && (!widgetEl || !widgetEl.isConnected)) {
+        widgetEl = null;
+        renderWidget();
+      }
+      if (panelOpen && panelEl && !panelEl.isConnected) {
+        panelEl = null;
+        panelOpen = false;
+        if (panelTarget) panelTarget.classList.remove(MARKED_CLASS);
+        panelTarget = null;
+      }
+    });
+    widgetWatcher.observe(document.documentElement, {
+      childList: true,
+      subtree: false,
+    });
+  }
+  function stopWidgetWatcher() {
+    if (widgetWatcher) {
+      widgetWatcher.disconnect();
+      widgetWatcher = null;
+    }
   }
 
   function applyWidgetPosition() {
@@ -537,6 +575,7 @@
     if (shortcutRes?.shortcut) shortcutLabel = shortcutRes.shortcut;
     document.addEventListener("keydown", onKeyDown, true);
     renderWidget();
+    startWidgetWatcher();
   }
 
   function escapeHtml(s) {
@@ -554,6 +593,7 @@
     setPicker(false);
     closeCommentPanel(true);
     document.removeEventListener("keydown", onKeyDown, true);
+    stopWidgetWatcher();
     renderWidget();
   }
 
