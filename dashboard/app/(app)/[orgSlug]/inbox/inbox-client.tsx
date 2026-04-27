@@ -79,6 +79,7 @@ export function InboxClient({
   const qParam = sp.get("q") || "";
   const projectsSel = parseList(sp.get("projects"));
   const contributorsSel = parseList(sp.get("contributors"));
+  const urlsSel = parseList(sp.get("urls"));
   const rangeParam = (sp.get("range") as Range) || "all";
   const viewParam = (sp.get("view") as View) || "grid";
 
@@ -99,8 +100,16 @@ export function InboxClient({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
-  function toggleList(key: "projects" | "contributors", value: string) {
-    const current = key === "projects" ? projectsSel : contributorsSel;
+  function toggleList(
+    key: "projects" | "contributors" | "urls",
+    value: string
+  ) {
+    const current =
+      key === "projects"
+        ? projectsSel
+        : key === "contributors"
+          ? contributorsSel
+          : urlsSel;
     const next = current.includes(value)
       ? current.filter((x) => x !== value)
       : [...current, value];
@@ -112,6 +121,15 @@ export function InboxClient({
     for (const c of comments) {
       if (!c.contributorName) continue;
       counts.set(c.contributorName, (counts.get(c.contributorName) || 0) + 1);
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [comments]);
+
+  const urls = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of comments) {
+      if (!c.url) continue;
+      counts.set(c.url, (counts.get(c.url) || 0) + 1);
     }
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   }, [comments]);
@@ -137,6 +155,7 @@ export function InboxClient({
           ? contributorsSel.includes((c.contributorName || "").trim())
           : true
       )
+      .filter((c) => (urlsSel.length ? urlsSel.includes(c.url) : true))
       .filter((c) => {
         if (!qLower) return true;
         return (
@@ -151,7 +170,7 @@ export function InboxClient({
       .sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-  }, [rangeFiltered, qParam, projectsSel, contributorsSel]);
+  }, [rangeFiltered, qParam, projectsSel, contributorsSel, urlsSel]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? filtered.find((c) => c.id === activeId) || null : null;
@@ -192,7 +211,10 @@ export function InboxClient({
   }
 
   const hasFilters =
-    !!qParam || projectsSel.length > 0 || contributorsSel.length > 0;
+    !!qParam ||
+    projectsSel.length > 0 ||
+    contributorsSel.length > 0 ||
+    urlsSel.length > 0;
 
   return (
     <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
@@ -261,7 +283,7 @@ export function InboxClient({
       </div>
 
       {/* Pills */}
-      {(projects.length > 0 || contributors.length > 0) && (
+      {(projects.length > 0 || contributors.length > 0 || urls.length > 0) && (
         <div className="mt-4 space-y-3">
           {projects.length > 0 && (
             <FilterRow label="Projet">
@@ -309,6 +331,39 @@ export function InboxClient({
                     <span
                       className={cn(
                         "text-[11px] tabular-nums",
+                        active ? "text-background/70" : "text-muted-foreground"
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </FilterRow>
+          )}
+
+          {urls.length > 0 && (
+            <FilterRow label="Page">
+              {urls.map(([url, count]) => {
+                const active = urlsSel.includes(url);
+                return (
+                  <button
+                    key={url}
+                    onClick={() => toggleList("urls", url)}
+                    title={url}
+                    className={cn(
+                      "inline-flex items-center gap-2 h-7 pl-2.5 pr-2.5 rounded-full border text-sm transition-colors max-w-[280px]",
+                      active
+                        ? "bg-foreground text-background border-foreground"
+                        : "bg-background hover:bg-muted"
+                    )}
+                  >
+                    <span className="font-mono text-xs truncate">
+                      {shortUrl(url)}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[11px] tabular-nums flex-shrink-0",
                         active ? "text-background/70" : "text-muted-foreground"
                       )}
                     >
