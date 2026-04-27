@@ -14,6 +14,8 @@ import {
   Inbox,
   Filter,
   ClipboardCheck,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn, formatDate, shortUrl, timeAgo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,13 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ContributorAvatar } from "@/components/contributor-avatar";
@@ -461,16 +457,34 @@ export function InboxClient({
         onClear={clearSelection}
       />
 
-      <Sheet
+      <Dialog
         open={!!active}
         onOpenChange={(o) => {
           if (!o) setActiveId(null);
         }}
       >
-        <SheetContent className="sm:max-w-2xl w-full p-0 overflow-y-auto gap-0">
-          {active && <DrawerBody comment={active} />}
-        </SheetContent>
-      </Sheet>
+        <DialogContent
+          className="sm:max-w-3xl w-full max-h-[90vh] overflow-hidden p-0 gap-0 flex flex-col"
+          showCloseButton={false}
+        >
+          {active && (
+            <DrawerBody
+              comment={active}
+              index={filtered.findIndex((c) => c.id === active.id)}
+              total={filtered.length}
+              onPrev={() => {
+                const i = filtered.findIndex((c) => c.id === active.id);
+                if (i > 0) setActiveId(filtered[i - 1].id);
+              }}
+              onNext={() => {
+                const i = filtered.findIndex((c) => c.id === active.id);
+                if (i < filtered.length - 1) setActiveId(filtered[i + 1].id);
+              }}
+              onClose={() => setActiveId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -897,7 +911,21 @@ function EmptyInbox({
 
 // ---------- Drawer body ----------
 
-function DrawerBody({ comment }: { comment: Comment }) {
+function DrawerBody({
+  comment,
+  index,
+  total,
+  onPrev,
+  onNext,
+  onClose,
+}: {
+  comment: Comment;
+  index: number;
+  total: number;
+  onPrev: () => void;
+  onNext: () => void;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [copied, setCopied] = useState<"selector" | "url" | null>(null);
   const [actionDraft, setActionDraft] = useState(comment.actionNote || "");
@@ -909,6 +937,31 @@ function DrawerBody({ comment }: { comment: Comment }) {
     setActionDraft(comment.actionNote || "");
     setActionDirty(false);
   }, [comment.id, comment.actionNote]);
+
+  // Keyboard navigation: ← / → to flip between cards
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      // Skip if typing in textarea/input
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "TEXTAREA" ||
+          target.tagName === "INPUT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (index > 0) onPrev();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (index < total - 1) onNext();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [index, total, onPrev, onNext]);
 
   async function copy(text: string, kind: "selector" | "url") {
     await navigator.clipboard.writeText(text);
@@ -957,29 +1010,37 @@ function DrawerBody({ comment }: { comment: Comment }) {
 
   return (
     <>
-      <SheetHeader className="p-6 pb-4 border-b">
-        <div className="flex items-center gap-3">
-          <ContributorAvatar name={comment.contributorName} size={32} />
-          <div className="min-w-0 flex-1">
-            <SheetTitle className="text-base font-medium">
-              {comment.contributorName || "—"}
-            </SheetTitle>
-            <SheetDescription>
-              {formatDate(comment.createdAt)} · {timeAgo(comment.createdAt)}
-            </SheetDescription>
+      <div className="p-5 pb-4 border-b flex items-center gap-3 flex-shrink-0">
+        <ContributorAvatar name={comment.contributorName} size={32} />
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-medium leading-tight">
+            {comment.contributorName || "—"}
           </div>
-          <Badge
-            variant="outline"
-            className={cn(
-              "h-6 px-2 font-medium capitalize",
-              STATUS_COLORS[comment.status] || ""
-            )}
-          >
-            {STATUS_LABELS[comment.status] || comment.status}
-          </Badge>
+          <div className="text-xs text-muted-foreground">
+            {formatDate(comment.createdAt)} · {timeAgo(comment.createdAt)}
+          </div>
         </div>
-      </SheetHeader>
+        <Badge
+          variant="outline"
+          className={cn(
+            "h-6 px-2 font-medium capitalize",
+            STATUS_COLORS[comment.status] || ""
+          )}
+        >
+          {STATUS_LABELS[comment.status] || comment.status}
+        </Badge>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          onClick={onClose}
+          className="ml-1"
+          aria-label="Fermer"
+        >
+          <X className="size-4" />
+        </Button>
+      </div>
 
+      <div className="overflow-y-auto flex-1">
       {comment.screenshotPath && (
         <div
           className="border-b"
@@ -1145,12 +1206,41 @@ function DrawerBody({ comment }: { comment: Comment }) {
         </div>
       </div>
 
-      <div className="sticky bottom-0 bg-background border-t p-4 flex justify-end">
-        <Button asChild>
-          <a href={comment.url} target="_blank" rel="noreferrer">
-            Ouvrir la page <ExternalLink className="size-3.5" />
-          </a>
+      </div>
+
+      <div className="border-t bg-background p-3 flex items-center gap-2 flex-shrink-0">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onPrev}
+          disabled={index <= 0}
+          aria-label="Précédent"
+        >
+          <ChevronLeft className="size-4" /> Précédent
         </Button>
+        <span className="text-xs text-muted-foreground tabular-nums px-2">
+          {index + 1} / {total}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onNext}
+          disabled={index >= total - 1}
+          aria-label="Suivant"
+        >
+          Suivant <ChevronRight className="size-4" />
+        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[11px] text-muted-foreground hidden sm:inline">
+            <kbd className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">←</kbd>{" "}
+            <kbd className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">→</kbd>
+          </span>
+          <Button asChild size="sm">
+            <a href={comment.url} target="_blank" rel="noreferrer">
+              Ouvrir la page <ExternalLink className="size-3.5" />
+            </a>
+          </Button>
+        </div>
       </div>
     </>
   );
