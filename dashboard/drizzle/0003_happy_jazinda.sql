@@ -1,0 +1,1 @@
+ALTER TABLE "comment" ADD COLUMN "priority" text DEFAULT 'normal' NOT NULL;

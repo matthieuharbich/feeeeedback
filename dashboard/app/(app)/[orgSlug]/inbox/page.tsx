@@ -63,6 +63,7 @@ export default async function InboxPage({
       viewportWidth: comment.viewportWidth,
       viewportHeight: comment.viewportHeight,
       status: comment.status,
+      priority: comment.priority,
       actionNote: comment.actionNote,
       resolvedAt: comment.resolvedAt,
       createdAt: comment.createdAt,

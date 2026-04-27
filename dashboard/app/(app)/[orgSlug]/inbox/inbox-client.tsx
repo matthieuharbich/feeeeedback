@@ -45,6 +45,7 @@ type Comment = {
   viewportWidth: number | null;
   viewportHeight: number | null;
   status: string;
+  priority: string;
   actionNote: string | null;
   resolvedAt: string | null;
   createdAt: string;
@@ -71,6 +72,27 @@ const STATUS_COLORS: Record<string, string> = {
   in_progress: "bg-amber-50 text-amber-700 border-amber-200",
   resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   archived: "bg-neutral-100 text-neutral-600 border-neutral-200",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  low: "Faible",
+  normal: "Normale",
+  high: "Haute",
+  urgent: "Urgent",
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  low: "bg-neutral-100 text-neutral-600 border-neutral-200",
+  normal: "bg-neutral-50 text-neutral-700 border-neutral-200",
+  high: "bg-orange-50 text-orange-700 border-orange-200",
+  urgent: "bg-red-50 text-red-700 border-red-200",
+};
+
+const PRIORITY_ORDER: Record<string, number> = {
+  urgent: 0,
+  high: 1,
+  normal: 2,
+  low: 3,
 };
 
 function parseList(v: string | null): string[] {
@@ -634,6 +656,14 @@ function CommentCard({
         <CardContent className="px-4 py-3">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <ProjectBadge c={c} />
+            {c.priority !== "normal" && (
+              <Badge
+                variant="outline"
+                className={cn("h-5 px-2 text-[10px]", PRIORITY_COLORS[c.priority])}
+              >
+                {PRIORITY_LABELS[c.priority]}
+              </Badge>
+            )}
             {c.status !== "open" && (
               <Badge
                 variant="outline"
@@ -691,6 +721,7 @@ function buildJsonExport(comments: Comment[]) {
       from: c.contributorName || null,
       project: c.projectName,
       status: c.status,
+      priority: c.priority,
       page: {
         url: c.url,
         title: c.pageTitle || null,
@@ -1011,6 +1042,21 @@ function DrawerBody({
     }
   }
 
+  async function setPriority(next: string) {
+    setStatusBusy(true);
+    try {
+      const res = await fetch(`/api/v1/comments/${comment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority: next }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      router.refresh();
+    } finally {
+      setStatusBusy(false);
+    }
+  }
+
   const statusActions: Array<{ value: string; label: string }> = [
     { value: "open", label: "Ouvert" },
     { value: "in_progress", label: "En cours" },
@@ -1030,6 +1076,17 @@ function DrawerBody({
             {formatDate(comment.createdAt)} · {timeAgo(comment.createdAt)}
           </div>
         </div>
+        {comment.priority !== "normal" && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "h-6 px-2 font-medium",
+              PRIORITY_COLORS[comment.priority] || ""
+            )}
+          >
+            {PRIORITY_LABELS[comment.priority]}
+          </Badge>
+        )}
         <Badge
           variant="outline"
           className={cn(
@@ -1151,6 +1208,33 @@ function DrawerBody({
                   )}
                 >
                   {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Priority */}
+        <section>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+            Priorité
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {(["low", "normal", "high", "urgent"] as const).map((p) => {
+              const active = comment.priority === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => !active && setPriority(p)}
+                  disabled={statusBusy}
+                  className={cn(
+                    "h-7 px-3 rounded-full border text-xs font-medium transition-colors disabled:opacity-50",
+                    active
+                      ? PRIORITY_COLORS[p] + " ring-2 ring-offset-1 ring-offset-background"
+                      : "bg-background hover:bg-muted text-muted-foreground"
+                  )}
+                >
+                  {PRIORITY_LABELS[p]}
                 </button>
               );
             })}

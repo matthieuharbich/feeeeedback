@@ -190,6 +190,7 @@ export const comment = pgTable(
     screenshotWidth: integer("screenshot_width"),
     screenshotHeight: integer("screenshot_height"),
     status: text("status").notNull().default("open"),
+    priority: text("priority").notNull().default("normal"),
     actionNote: text("action_note"),
     resolvedAt: timestamp("resolved_at"),
     resolvedBy: text("resolved_by").references(() => user.id),

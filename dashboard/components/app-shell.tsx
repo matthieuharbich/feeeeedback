@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Inbox,
   FolderKanban,
   Users,
-  Settings,
   ChevronsUpDown,
   Plus,
   LogOut,
@@ -53,6 +52,8 @@ export function AppShell({
   );
 }
 
+type Project = { id: string; name: string; slug: string; color: string; organizationId: string };
+
 function Sidebar({
   user,
   orgs,
@@ -63,12 +64,28 @@ function Sidebar({
   currentOrg: Org | undefined;
 }) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentOrg?.id) return;
+    fetch("/api/v1/projects", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const list: Project[] = data.projects || [];
+        setProjects(list.filter((p) => p.organizationId === currentOrg.id));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentOrg?.id, pathname]);
 
   const navItems = currentOrg?.slug
     ? [
         { href: `/${currentOrg.slug}/inbox`, label: "Inbox", icon: Inbox },
-        { href: `/${currentOrg.slug}/projects`, label: "Projets", icon: FolderKanban },
+        { href: `/${currentOrg.slug}/projects`, label: "Tous les projets", icon: FolderKanban },
         { href: `/${currentOrg.slug}/members`, label: "Membres", icon: Users },
       ]
     : [];
@@ -79,12 +96,15 @@ function Sidebar({
         <OrgSwitcher orgs={orgs} currentOrg={currentOrg} />
       </div>
 
-      <nav className="px-3 py-2 flex-1">
+      <nav className="px-3 py-2 flex-1 overflow-y-auto">
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium px-2 mb-1">
           Workspace
         </div>
         {navItems.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active =
+            item.label === "Inbox"
+              ? pathname === item.href || pathname.startsWith(`${item.href}?`)
+              : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link
@@ -102,6 +122,45 @@ function Sidebar({
             </Link>
           );
         })}
+
+        {currentOrg?.slug && projects.length > 0 && (
+          <>
+            <div className="flex items-center justify-between px-2 mb-1 mt-6">
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Projets
+              </span>
+              <Link
+                href={`/${currentOrg.slug}/projects/new`}
+                className="text-muted-foreground hover:text-sidebar-accent-foreground"
+                title="Nouveau projet"
+              >
+                <Plus size={13} />
+              </Link>
+            </div>
+            {projects.map((p) => {
+              const href = `/${currentOrg.slug}/projects/${p.slug}`;
+              const active = pathname.startsWith(href);
+              return (
+                <Link
+                  key={p.id}
+                  href={href}
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors mb-0.5",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: p.color }}
+                  />
+                  <span className="truncate">{p.name}</span>
+                </Link>
+              );
+            })}
+          </>
+        )}
 
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium px-2 mb-1 mt-6">
           Ressources
@@ -123,6 +182,7 @@ function Sidebar({
 }
 
 function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
+  const router = useRouter();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent text-left outline-none">
@@ -142,10 +202,7 @@ function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
           Organisations
         </DropdownMenuLabel>
         {orgs.map((o) => (
-          <DropdownMenuItem
-            key={o.id}
-            render={<Link href={`/${o.slug}/inbox`} />}
-          >
+          <DropdownMenuItem key={o.id} onClick={() => router.push(`/${o.slug}/inbox`)}>
             <div className="w-5 h-5 rounded bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold mr-1.5">
               {initials(o.name)}
             </div>
@@ -154,7 +211,7 @@ function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href="/onboarding" />}>
+        <DropdownMenuItem onClick={() => router.push("/onboarding")}>
           <Plus size={13} className="mr-1.5" />
           Nouvelle organisation
         </DropdownMenuItem>
@@ -166,8 +223,11 @@ function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
 function UserMenu({ user, currentOrgSlug }: { user: User; currentOrgSlug?: string }) {
   const router = useRouter();
   async function logout() {
-    await authClient.signOut();
-    router.push("/");
+    try {
+      await authClient.signOut();
+    } catch {}
+    router.push("/login");
+    router.refresh();
   }
   return (
     <DropdownMenu>
@@ -182,14 +242,16 @@ function UserMenu({ user, currentOrgSlug }: { user: User; currentOrgSlug?: strin
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-56">
-        <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
+        <DropdownMenuLabel>{user.name || user.email}</DropdownMenuLabel>
         {currentOrgSlug && (
-          <DropdownMenuItem render={<Link href={`/${currentOrgSlug}/members`} />}>
+          <DropdownMenuItem
+            onClick={() => router.push(`/${currentOrgSlug}/members`)}
+          >
             <Users size={13} className="mr-1.5" />
             Membres
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem render={<Link href="/install" />}>
+        <DropdownMenuItem onClick={() => router.push("/install")}>
           <Puzzle size={13} className="mr-1.5" />
           Télécharger l'extension
         </DropdownMenuItem>

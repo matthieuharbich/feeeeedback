@@ -7,6 +7,9 @@ import { comment, member, project } from "@/lib/db/schema";
 const VALID_STATUSES = ["open", "in_progress", "resolved", "archived"] as const;
 type Status = (typeof VALID_STATUSES)[number];
 
+const VALID_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+type Priority = (typeof VALID_PRIORITIES)[number];
+
 export const OPTIONS = () => optionsResponse();
 
 export async function PATCH(
@@ -19,6 +22,7 @@ export async function PATCH(
   const { id } = await ctx.params;
   const body = await req.json().catch(() => ({}));
   const status = body?.status as Status | undefined;
+  const priority = body?.priority as Priority | undefined;
   const actionNote =
     typeof body?.actionNote === "string" || body?.actionNote === null
       ? (body.actionNote as string | null)
@@ -26,7 +30,10 @@ export async function PATCH(
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
     return json({ error: "invalid status" }, 400);
   }
-  if (status === undefined && actionNote === undefined) {
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) {
+    return json({ error: "invalid priority" }, 400);
+  }
+  if (status === undefined && priority === undefined && actionNote === undefined) {
     return json({ error: "nothing to update" }, 400);
   }
 
@@ -64,12 +71,15 @@ export async function PATCH(
       updates.resolvedBy = null;
     }
   }
+  if (priority !== undefined) {
+    updates.priority = priority;
+  }
   if (actionNote !== undefined) {
     updates.actionNote = actionNote ? actionNote.trim() : null;
   }
 
   await db.update(comment).set(updates).where(eq(comment.id, id));
-  return json({ id, status, actionNote });
+  return json({ id, status, priority, actionNote });
 }
 
 export async function DELETE(
