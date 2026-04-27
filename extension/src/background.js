@@ -45,7 +45,22 @@ async function sendToTab(tabId, message) {
   try {
     return await chrome.tabs.sendMessage(tabId, message);
   } catch (err) {
-    return { ok: false, error: err.message };
+    // Content script not loaded yet — inject it on demand and retry once.
+    // This handles fresh tabs, edge-case SPA wipes, and any timing where
+    // the content_scripts entry hasn't run yet.
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["src/format.js", "src/api.js", "src/content.js"],
+      });
+      await chrome.scripting.insertCSS({
+        target: { tabId },
+        files: ["src/content.css"],
+      });
+      return await chrome.tabs.sendMessage(tabId, message);
+    } catch (err2) {
+      return { ok: false, error: err2.message || err.message };
+    }
   }
 }
 

@@ -447,7 +447,11 @@
         </div>
       </div>
       <button class="ff-toggle ${pickerActive ? "active" : ""}" data-ff-picker>
-        ${pickerActive ? "● Sélecteur actif — clique un élément" : "○ Activer le sélecteur"}
+        <span class="ff-toggle-switch"></span>
+        <span class="ff-toggle-label">
+          <span class="ff-toggle-main">${pickerActive ? "Sélecteur actif" : "Sélecteur"}</span>
+          <span class="ff-toggle-sub">${pickerActive ? "Clique un élément de la page" : "Active pour pointer un élément"}</span>
+        </span>
       </button>
       <div class="ff-widget-list"></div>
       <div class="ff-widget-actions">
