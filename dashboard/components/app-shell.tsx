@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Inbox,
   FolderKanban,
@@ -15,14 +15,6 @@ import {
 } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type Org = { id: string; name: string; slug: string | null; logo: string | null };
@@ -181,86 +173,165 @@ function Sidebar({
   );
 }
 
+function useOutsideClose(open: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open, onClose]);
+  return ref;
+}
+
 function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useOutsideClose(open, () => setOpen(false));
+
+  function go(href: string) {
+    setOpen(false);
+    router.push(href);
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent text-left outline-none">
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent text-left"
+      >
         <div className="w-7 h-7 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
           {initials(currentOrg?.name || "f")}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{currentOrg?.name || "feeeeedback"}</div>
+          <div className="text-sm font-semibold truncate">
+            {currentOrg?.name || "feeeeedback"}
+          </div>
           <div className="text-[11px] text-muted-foreground truncate">
-            {currentOrg?.slug ? `feeeeedback.mtth.world/${currentOrg.slug}` : "Choisir une organisation"}
+            {currentOrg?.slug
+              ? `feeeeedback.mtth.world/${currentOrg.slug}`
+              : "Choisir une organisation"}
           </div>
         </div>
         <ChevronsUpDown size={14} className="text-muted-foreground flex-shrink-0" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="text-[11px] uppercase tracking-wider">
-          Organisations
-        </DropdownMenuLabel>
-        {orgs.map((o) => (
-          <DropdownMenuItem key={o.id} onClick={() => router.push(`/${o.slug}/inbox`)}>
-            <div className="w-5 h-5 rounded bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold mr-1.5">
-              {initials(o.name)}
-            </div>
-            <span className="flex-1 truncate">{o.name}</span>
-            {o.id === currentOrg?.id && <Check size={13} />}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/onboarding")}>
-          <Plus size={13} className="mr-1.5" />
-          Nouvelle organisation
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-56 bg-popover text-popover-foreground rounded-lg shadow-lg ring-1 ring-foreground/10 py-1 z-50">
+          <div className="px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+            Organisations
+          </div>
+          {orgs.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => go(`/${o.slug}/inbox`)}
+              className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1"
+            >
+              <div className="w-5 h-5 rounded bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold">
+                {initials(o.name)}
+              </div>
+              <span className="flex-1 truncate">{o.name}</span>
+              {o.id === currentOrg?.id && <Check size={13} />}
+            </button>
+          ))}
+          <div className="my-1 border-t" />
+          <button
+            type="button"
+            onClick={() => go("/onboarding")}
+            className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1 text-muted-foreground"
+          >
+            <Plus size={13} />
+            Nouvelle organisation
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
 function UserMenu({ user, currentOrgSlug }: { user: User; currentOrgSlug?: string }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useOutsideClose(open, () => setOpen(false));
+
   async function logout() {
+    setOpen(false);
     try {
       await authClient.signOut();
     } catch {}
     router.push("/login");
     router.refresh();
   }
+
+  function go(href: string) {
+    setOpen(false);
+    router.push(href);
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent text-left outline-none">
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent text-left"
+      >
         <Avatar className="h-7 w-7">
           <AvatarImage src={user.image || undefined} alt={user.name} />
           <AvatarFallback>{initials(user.name, user.email)}</AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{user.name || user.email}</div>
+          <div className="text-sm font-medium truncate">
+            {user.name || user.email}
+          </div>
           <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>
         </div>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" className="w-56">
-        <DropdownMenuLabel>{user.name || user.email}</DropdownMenuLabel>
-        {currentOrgSlug && (
-          <DropdownMenuItem
-            onClick={() => router.push(`/${currentOrgSlug}/members`)}
+      </button>
+      {open && (
+        <div className="absolute left-0 bottom-full mb-1 w-56 bg-popover text-popover-foreground rounded-lg shadow-lg ring-1 ring-foreground/10 py-1 z-50">
+          <div className="px-3 py-1.5 text-xs font-medium border-b mb-1">
+            {user.name || user.email}
+          </div>
+          {currentOrgSlug && (
+            <button
+              type="button"
+              onClick={() => go(`/${currentOrgSlug}/members`)}
+              className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1"
+            >
+              <Users size={13} />
+              Membres
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => go("/install")}
+            className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1"
           >
-            <Users size={13} className="mr-1.5" />
-            Membres
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => router.push("/install")}>
-          <Puzzle size={13} className="mr-1.5" />
-          Télécharger l'extension
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={logout}>
-          <LogOut size={13} className="mr-1.5" />
-          Se déconnecter
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <Puzzle size={13} />
+            Télécharger l'extension
+          </button>
+          <div className="my-1 border-t" />
+          <button
+            type="button"
+            onClick={logout}
+            className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1 text-destructive"
+          >
+            <LogOut size={13} />
+            Se déconnecter
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
