@@ -1,0 +1,1 @@
+ALTER TABLE "comment" ADD COLUMN "action_note" text;

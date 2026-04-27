@@ -15,12 +15,13 @@ import {
   Filter,
   ClipboardCheck,
 } from "lucide-react";
-import { cn, formatDate, shortUrl, timeAgo, dayKey } from "@/lib/utils";
+import { cn, formatDate, shortUrl, timeAgo } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -47,6 +48,9 @@ type Comment = {
   screenshotHeight: number | null;
   viewportWidth: number | null;
   viewportHeight: number | null;
+  status: string;
+  actionNote: string | null;
+  resolvedAt: string | null;
   createdAt: string;
   projectId: string;
   projectName: string;
@@ -57,7 +61,21 @@ type Comment = {
 };
 
 type View = "grid" | "list";
-type Range = "all" | "today" | "week";
+type StatusFilter = "open" | "in_progress" | "resolved" | "archived" | "all";
+
+const STATUS_LABELS: Record<string, string> = {
+  open: "Ouvert",
+  in_progress: "En cours",
+  resolved: "Résolu",
+  archived: "Archivé",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  open: "bg-blue-50 text-blue-700 border-blue-200",
+  in_progress: "bg-amber-50 text-amber-700 border-amber-200",
+  resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  archived: "bg-neutral-100 text-neutral-600 border-neutral-200",
+};
 
 function parseList(v: string | null): string[] {
   return (v || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -80,7 +98,7 @@ export function InboxClient({
   const projectsSel = parseList(sp.get("projects"));
   const contributorsSel = parseList(sp.get("contributors"));
   const urlsSel = parseList(sp.get("urls"));
-  const rangeParam = (sp.get("range") as Range) || "all";
+  const statusParam = (sp.get("status") as StatusFilter) || "open";
   const viewParam = (sp.get("view") as View) || "grid";
 
   const [q, setQ] = useState(qParam);
@@ -134,21 +152,27 @@ export function InboxClient({
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   }, [comments]);
 
-  const rangeFiltered = useMemo(() => {
-    if (rangeParam === "today") {
-      const k = dayKey(new Date());
-      return comments.filter((c) => dayKey(c.createdAt) === k);
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      open: 0,
+      in_progress: 0,
+      resolved: 0,
+      archived: 0,
+    };
+    for (const c of comments) {
+      if (counts[c.status] !== undefined) counts[c.status]++;
     }
-    if (rangeParam === "week") {
-      const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
-      return comments.filter((c) => new Date(c.createdAt).getTime() >= weekAgo);
-    }
-    return comments;
-  }, [comments, rangeParam]);
+    return counts;
+  }, [comments]);
+
+  const statusFiltered = useMemo(() => {
+    if (statusParam === "all") return comments;
+    return comments.filter((c) => c.status === statusParam);
+  }, [comments, statusParam]);
 
   const filtered = useMemo(() => {
     const qLower = qParam.toLowerCase();
-    return rangeFiltered
+    return statusFiltered
       .filter((c) => (projectsSel.length ? projectsSel.includes(c.projectSlug) : true))
       .filter((c) =>
         contributorsSel.length
@@ -170,7 +194,7 @@ export function InboxClient({
       .sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-  }, [rangeFiltered, qParam, projectsSel, contributorsSel, urlsSel]);
+  }, [statusFiltered, qParam, projectsSel, contributorsSel, urlsSel]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? filtered.find((c) => c.id === activeId) || null : null;
@@ -250,16 +274,46 @@ export function InboxClient({
         }
       />
 
-      {/* Range tabs + search */}
+      {/* Status tabs + search */}
       <div className="flex items-center justify-between gap-3 mt-6 flex-wrap">
         <Tabs
-          value={rangeParam}
-          onValueChange={(v) => updateParam("range", v === "all" ? null : v)}
+          value={statusParam}
+          onValueChange={(v) => updateParam("status", v === "open" ? null : v)}
         >
           <TabsList>
+            <TabsTrigger value="open">
+              Ouverts
+              {statusCounts.open > 0 && (
+                <span className="ml-1.5 text-xs tabular-nums opacity-60">
+                  {statusCounts.open}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="in_progress">
+              En cours
+              {statusCounts.in_progress > 0 && (
+                <span className="ml-1.5 text-xs tabular-nums opacity-60">
+                  {statusCounts.in_progress}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="resolved">
+              Résolus
+              {statusCounts.resolved > 0 && (
+                <span className="ml-1.5 text-xs tabular-nums opacity-60">
+                  {statusCounts.resolved}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="archived">
+              Archivés
+              {statusCounts.archived > 0 && (
+                <span className="ml-1.5 text-xs tabular-nums opacity-60">
+                  {statusCounts.archived}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="all">Tous</TabsTrigger>
-            <TabsTrigger value="week">Cette semaine</TabsTrigger>
-            <TabsTrigger value="today">Aujourd'hui</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -564,13 +618,29 @@ function CommentCard({
           <Thumb c={c} />
         </div>
         <CardContent className="px-4 py-3">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <ProjectBadge c={c} />
-            <span className="text-[11px] text-muted-foreground">
+            {c.status !== "open" && (
+              <Badge
+                variant="outline"
+                className={cn("h-5 px-2 text-[10px] capitalize", STATUS_COLORS[c.status])}
+              >
+                {STATUS_LABELS[c.status]}
+              </Badge>
+            )}
+            <span className="text-[11px] text-muted-foreground ml-auto">
               {timeAgo(c.createdAt)}
             </span>
           </div>
           <p className="text-sm leading-relaxed line-clamp-3">{c.comment}</p>
+          {c.actionNote && (
+            <div className="mt-2 text-xs text-foreground/80 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 line-clamp-2">
+              <span className="text-[10px] uppercase tracking-wider text-amber-700 font-semibold mr-1.5">
+                Action
+              </span>
+              {c.actionNote}
+            </div>
+          )}
           <div className="mt-3 pt-3 border-t flex items-center gap-2">
             <ContributorAvatar name={c.contributorName} size={22} />
             <span className="text-xs font-medium truncate">
@@ -588,13 +658,15 @@ function CommentCard({
 function buildJsonExport(comments: Comment[]) {
   return {
     tool: "feeeeedback",
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     count: comments.length,
     items: comments.map((c) => ({
-      comment: c.comment,
+      feedback: c.comment,
+      action: c.actionNote || null,
       from: c.contributorName || null,
       project: c.projectName,
+      status: c.status,
       page: {
         url: c.url,
         title: c.pageTitle || null,
@@ -628,11 +700,14 @@ function SelectionBar({
   onDeselectAll: () => void;
   onClear: () => void;
 }) {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
 
   if (selected.size === 0) return null;
 
   const selectedComments = comments.filter((c) => selected.has(c.id));
+  const selectedIds = selectedComments.map((c) => c.id);
 
   async function copyJson() {
     const payload = buildJsonExport(selectedComments);
@@ -641,9 +716,28 @@ function SelectionBar({
     setTimeout(() => setCopied(false), 1600);
   }
 
+  async function bulkStatus(status: string, label: string) {
+    setBusy(label);
+    try {
+      await Promise.all(
+        selectedIds.map((id) =>
+          fetch(`/api/v1/comments/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          })
+        )
+      );
+      onClear();
+      router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
-      <div className="bg-foreground text-background rounded-xl shadow-2xl px-2 py-2 flex items-center gap-1">
+      <div className="bg-foreground text-background rounded-xl shadow-2xl px-2 py-2 flex items-center gap-1 flex-wrap max-w-[95vw]">
         <span className="px-3 text-sm font-medium tabular-nums">
           {selected.size} sélectionné{selected.size > 1 ? "s" : ""}
         </span>
@@ -663,6 +757,34 @@ function SelectionBar({
           onClick={onClear}
         >
           Effacer
+        </Button>
+        <span className="w-px h-5 bg-background/20" />
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!!busy}
+          className="text-background hover:bg-background/10 hover:text-background"
+          onClick={() => bulkStatus("in_progress", "in_progress")}
+        >
+          {busy === "in_progress" ? "…" : "En cours"}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!!busy}
+          className="text-background hover:bg-background/10 hover:text-background"
+          onClick={() => bulkStatus("resolved", "resolved")}
+        >
+          {busy === "resolved" ? "…" : "Résoudre"}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!!busy}
+          className="text-background hover:bg-background/10 hover:text-background"
+          onClick={() => bulkStatus("archived", "archived")}
+        >
+          {busy === "archived" ? "…" : "Archiver"}
         </Button>
         <span className="w-px h-5 bg-background/20" />
         <Button
@@ -776,13 +898,62 @@ function EmptyInbox({
 // ---------- Drawer body ----------
 
 function DrawerBody({ comment }: { comment: Comment }) {
+  const router = useRouter();
   const [copied, setCopied] = useState<"selector" | "url" | null>(null);
+  const [actionDraft, setActionDraft] = useState(comment.actionNote || "");
+  const [actionDirty, setActionDirty] = useState(false);
+  const [actionSaving, setActionSaving] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+
+  useEffect(() => {
+    setActionDraft(comment.actionNote || "");
+    setActionDirty(false);
+  }, [comment.id, comment.actionNote]);
 
   async function copy(text: string, kind: "selector" | "url") {
     await navigator.clipboard.writeText(text);
     setCopied(kind);
     setTimeout(() => setCopied(null), 1200);
   }
+
+  async function saveAction() {
+    if (!actionDirty) return;
+    setActionSaving(true);
+    try {
+      const res = await fetch(`/api/v1/comments/${comment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionNote: actionDraft.trim() || null }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setActionDirty(false);
+      router.refresh();
+    } finally {
+      setActionSaving(false);
+    }
+  }
+
+  async function setStatus(next: string) {
+    setStatusBusy(true);
+    try {
+      const res = await fetch(`/api/v1/comments/${comment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      router.refresh();
+    } finally {
+      setStatusBusy(false);
+    }
+  }
+
+  const statusActions: Array<{ value: string; label: string }> = [
+    { value: "open", label: "Ouvert" },
+    { value: "in_progress", label: "En cours" },
+    { value: "resolved", label: "Résolu" },
+    { value: "archived", label: "Archivé" },
+  ];
 
   return (
     <>
@@ -797,6 +968,15 @@ function DrawerBody({ comment }: { comment: Comment }) {
               {formatDate(comment.createdAt)} · {timeAgo(comment.createdAt)}
             </SheetDescription>
           </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              "h-6 px-2 font-medium capitalize",
+              STATUS_COLORS[comment.status] || ""
+            )}
+          >
+            {STATUS_LABELS[comment.status] || comment.status}
+          </Badge>
         </div>
       </SheetHeader>
 
@@ -834,9 +1014,77 @@ function DrawerBody({ comment }: { comment: Comment }) {
           )}
         </div>
 
-        <p className="text-base leading-relaxed whitespace-pre-wrap">
-          {comment.comment}
-        </p>
+        {/* Feedback (from contributor — read-only) */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              Feedback
+            </div>
+            <span className="text-[10px] text-muted-foreground">
+              {comment.contributorName || "—"}
+            </span>
+          </div>
+          <p className="text-base leading-relaxed whitespace-pre-wrap rounded-lg bg-muted/40 p-3.5 border">
+            {comment.comment}
+          </p>
+        </section>
+
+        {/* Action — editable PO note */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              Action à prendre
+            </div>
+            {actionDirty && (
+              <span className="text-[10px] text-amber-600">Non enregistré</span>
+            )}
+          </div>
+          <Textarea
+            value={actionDraft}
+            onChange={(e) => {
+              setActionDraft(e.target.value);
+              setActionDirty(true);
+            }}
+            onBlur={saveAction}
+            placeholder="Décris l'action à prendre — cette note sera incluse dans l'export JSON pour Claude Code."
+            rows={4}
+            className="resize-y"
+          />
+          {actionDirty && (
+            <div className="flex justify-end mt-2">
+              <Button size="sm" onClick={saveAction} disabled={actionSaving}>
+                {actionSaving ? "…" : "Enregistrer"}
+              </Button>
+            </div>
+          )}
+        </section>
+
+        {/* Status workflow */}
+        <section>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+            Statut
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {statusActions.map((s) => {
+              const active = comment.status === s.value;
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => !active && setStatus(s.value)}
+                  disabled={statusBusy}
+                  className={cn(
+                    "h-7 px-3 rounded-full border text-xs font-medium transition-colors disabled:opacity-50",
+                    active
+                      ? STATUS_COLORS[s.value] + " ring-2 ring-offset-1 ring-offset-background"
+                      : "bg-background hover:bg-muted text-muted-foreground"
+                  )}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {comment.text && (
           <div>

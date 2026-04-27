@@ -62,6 +62,9 @@ export default async function InboxPage({
       screenshotHeight: comment.screenshotHeight,
       viewportWidth: comment.viewportWidth,
       viewportHeight: comment.viewportHeight,
+      status: comment.status,
+      actionNote: comment.actionNote,
+      resolvedAt: comment.resolvedAt,
       createdAt: comment.createdAt,
       projectId: comment.projectId,
       projectName: project.name,
@@ -82,6 +85,7 @@ export default async function InboxPage({
   const serialized = rows.map((r) => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
+    resolvedAt: r.resolvedAt ? r.resolvedAt.toISOString() : null,
   }));
 
   return (

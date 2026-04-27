@@ -15,6 +15,13 @@
       "when": 1777038018376,
       "tag": "0001_purple_pet_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777294031576,
+      "tag": "0002_wet_ares",
+      "breakpoints": true
     }
   ]
 }
