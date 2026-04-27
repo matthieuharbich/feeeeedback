@@ -674,6 +674,16 @@ function buildJsonExport(comments: Comment[]) {
     tool: "feeeeedback",
     version: 2,
     exportedAt: new Date().toISOString(),
+    prompt: [
+      "Tu reçois une liste de retours capturés sur un site live via l'extension feeeeedback.",
+      "Pour chaque item :",
+      "- `feedback` : ce qu'un utilisateur (champ `from`) a remonté en pointant un élément précis de la page. C'est sa voix, brute.",
+      "- `action` : ce que moi (Product Owner) je te demande de faire en réponse. C'est l'instruction à exécuter.",
+      "- `element.selector` te permet de cibler exactement l'élément concerné.",
+      "- `page.url` est la page où le retour a été pris ; utilise-la pour retrouver le composant dans le code.",
+      "Concentre-toi sur le champ `action` pour savoir quoi coder. Le `feedback` te donne le pourquoi.",
+      "Ignore les items dont `status` vaut `archived` ou `resolved` sauf demande explicite.",
+    ].join("\n"),
     count: comments.length,
     items: comments.map((c) => ({
       feedback: c.comment,
