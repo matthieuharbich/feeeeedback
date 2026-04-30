@@ -48,7 +48,9 @@ export async function POST(req: NextRequest) {
   }
   const extUser = rows[0];
 
-  // Ensure extension user is a member of every org (so it can post to any project)
+  // Ensure extension user is admin of every org so it sees every project
+  // regardless of project_member rows (it's the shared account used by all
+  // contributors via the unlock password — needs full org visibility).
   const allOrgs = await db.select().from(organization);
   for (const org of allOrgs) {
     const existing = await db
@@ -61,8 +63,13 @@ export async function POST(req: NextRequest) {
         id: nid(),
         organizationId: org.id,
         userId: extUser.id,
-        role: "member",
+        role: "admin",
       });
+    } else if (existing[0].role !== "admin" && existing[0].role !== "owner") {
+      await db
+        .update(member)
+        .set({ role: "admin" })
+        .where(eq(member.id, existing[0].id));
     }
   }
 
