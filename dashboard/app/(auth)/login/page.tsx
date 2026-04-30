@@ -3,20 +3,19 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mail, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { loginIdToEmail } from "@/lib/auth-username";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const redirect = params.get("redirect") || "/";
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"magic" | "password">("magic");
-  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,54 +24,20 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
-      if (mode === "password") {
-        const { error: err } = await authClient.signIn.email({
-          email,
-          password,
-          callbackURL: redirect,
-        });
-        if (err) throw new Error(err.message || "Identifiants incorrects");
-        router.push(redirect);
-        router.refresh();
-      } else {
-        const { error: err } = await authClient.signIn.magicLink({
-          email,
-          callbackURL: redirect,
-        });
-        if (err) throw new Error(err.message || "Erreur");
-        setSent(true);
-      }
+      const email = loginIdToEmail(identifier);
+      const { error: err } = await authClient.signIn.email({
+        email,
+        password,
+        callbackURL: redirect,
+      });
+      if (err) throw new Error(err.message || "Identifiants incorrects");
+      router.push(redirect);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
       setLoading(false);
     }
-  }
-
-  if (sent) {
-    return (
-      <div className="text-center">
-        <div className="w-12 h-12 mx-auto rounded-full bg-brand/10 flex items-center justify-center mb-6 text-brand">
-          <Mail className="size-5" />
-        </div>
-        <h1 className="text-xl font-semibold tracking-tight mb-2">
-          Vérifie ta boîte mail
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Lien envoyé à <strong>{email}</strong>. Il expire dans 5 min.
-        </p>
-        <Button
-          variant="link"
-          className="mt-6 text-muted-foreground"
-          onClick={() => {
-            setSent(false);
-            setEmail("");
-          }}
-        >
-          Utiliser un autre email
-        </Button>
-      </div>
-    );
   }
 
   return (
@@ -81,65 +46,51 @@ function LoginForm() {
         Se connecter
       </h1>
       <p className="text-sm text-muted-foreground text-center mb-8">
-        {mode === "password"
-          ? "Email + mot de passe."
-          : "On t'envoie un lien magique pour te connecter."}
+        Pseudo et mot de passe.
       </p>
 
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="space-y-1.5">
-          <Label htmlFor="email" className="sr-only">Email</Label>
+          <Label htmlFor="identifier" className="sr-only">
+            Pseudo
+          </Label>
           <Input
-            id="email"
-            type="email"
+            id="identifier"
+            type="text"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="toi@exemple.com"
+            autoComplete="username"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="Pseudo (ex. Tony)"
             autoFocus
           />
         </div>
-        {mode === "password" && (
-          <div className="space-y-1.5">
-            <Label htmlFor="password" className="sr-only">Mot de passe</Label>
-            <Input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mot de passe"
-            />
-          </div>
-        )}
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="sr-only">
+            Mot de passe
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Mot de passe"
+          />
+        </div>
         <Button
           type="submit"
-          disabled={loading || !email || (mode === "password" && !password)}
+          disabled={loading || !identifier || !password}
           className="w-full"
         >
           {loading && <Loader2 className="size-4 animate-spin" />}
-          {mode === "password" ? "Se connecter" : "M'envoyer le lien"}
+          Se connecter
         </Button>
-        {error && <p className="text-sm text-destructive text-center">{error}</p>}
+        {error && (
+          <p className="text-sm text-destructive text-center">{error}</p>
+        )}
       </form>
-
-      <div className="mt-6 text-center">
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          onClick={() => {
-            setMode(mode === "password" ? "magic" : "password");
-            setError(null);
-            setPassword("");
-          }}
-          className="text-muted-foreground"
-        >
-          {mode === "password"
-            ? "Utiliser un lien magique à la place"
-            : "J'ai un mot de passe"}
-        </Button>
-      </div>
     </>
   );
 }

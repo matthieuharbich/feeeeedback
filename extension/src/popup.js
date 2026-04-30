@@ -1,7 +1,8 @@
-// feeeeedback — popup (shared password unlock + contributor selector)
+// feeeeedback — popup (shared password unlock + org selector + contributor)
 
 const API_BASE = "https://feeeeedback.mtth.world";
 const CONTRIB_KEY = "ff_contributor";
+const ORG_KEY = "ff_active_org";
 const CONTRIB_DEFAULTS = ["Nicolas", "Juliane", "Damien", "Tony"];
 
 const $ = (id) => document.getElementById(id);
@@ -17,6 +18,7 @@ const els = {
   localStartBtn: $("localStartBtn"),
   lockBtn: $("lockBtn"),
   tabUrl: $("tabUrl"),
+  orgSelect: $("orgSelect"),
   projectSelect: $("projectSelect"),
   contributorSelect: $("contributorSelect"),
   contributorCustom: $("contributorCustom"),
@@ -38,12 +40,14 @@ let currentTab = null;
 let matchedProjects = [];
 let allProjects = [];
 let savedContributor = null;
+let activeOrgId = null;
 
 async function init() {
   auth = await ffGetAuth();
   session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
   [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   savedContributor = await loadContributor();
+  activeOrgId = await loadActiveOrg();
 
   if (auth && currentTab?.url) {
     await refreshProjects();
@@ -75,8 +79,19 @@ async function saveContributor(c) {
   savedContributor = c;
 }
 
+async function loadActiveOrg() {
+  const { [ORG_KEY]: o } = await chrome.storage.local.get(ORG_KEY);
+  return o || null;
+}
+
+async function saveActiveOrg(orgId) {
+  await chrome.storage.local.set({ [ORG_KEY]: orgId });
+  activeOrgId = orgId;
+}
+
 function currentContributorName() {
-  if (savedContributor?.kind === "custom") return (savedContributor.value || "").trim() || null;
+  if (savedContributor?.kind === "custom")
+    return (savedContributor.value || "").trim() || null;
   return savedContributor?.value || null;
 }
 
@@ -115,6 +130,32 @@ function render() {
   if (auth) {
     els.tabUrl.textContent = currentTab?.url ? ffShortUrl(currentTab.url) : "—";
 
+    // --- Org selector ---
+    const orgs = auth.orgs || [];
+    if (els.orgSelect) {
+      els.orgSelect.innerHTML = "";
+      if (orgs.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "(aucune organisation)";
+        els.orgSelect.appendChild(opt);
+        els.orgSelect.disabled = true;
+      } else {
+        els.orgSelect.disabled = false;
+        for (const org of orgs) {
+          const opt = document.createElement("option");
+          opt.value = org.id;
+          opt.textContent = org.name;
+          els.orgSelect.appendChild(opt);
+        }
+        if (!activeOrgId || !orgs.find((o) => o.id === activeOrgId)) {
+          activeOrgId = orgs[0].id;
+        }
+        els.orgSelect.value = activeOrgId;
+      }
+    }
+
+    // --- Project selector (filter by active org) ---
     const select = els.projectSelect;
     select.innerHTML = "";
 
@@ -123,21 +164,26 @@ function render() {
     optNone.textContent = "— Local (copier JSON) —";
     select.appendChild(optNone);
 
-    if (matchedProjects.length) {
+    const orgMatched = matchedProjects.filter(
+      (p) => !activeOrgId || p.organizationId === activeOrgId
+    );
+    const orgOthers = allProjects
+      .filter((p) => !activeOrgId || p.organizationId === activeOrgId)
+      .filter((p) => !orgMatched.find((m) => m.id === p.id));
+
+    if (orgMatched.length) {
       const group = document.createElement("optgroup");
       group.label = "Correspond à cette page";
-      matchedProjects.forEach((p) => group.appendChild(projectOption(p)));
+      orgMatched.forEach((p) => group.appendChild(projectOption(p)));
       select.appendChild(group);
     }
-    const others = allProjects.filter((p) => !matchedProjects.find((m) => m.id === p.id));
-    if (others.length) {
+    if (orgOthers.length) {
       const group = document.createElement("optgroup");
       group.label = "Autres projets";
-      others.forEach((p) => group.appendChild(projectOption(p)));
+      orgOthers.forEach((p) => group.appendChild(projectOption(p)));
       select.appendChild(group);
     }
-
-    if (matchedProjects.length) select.value = matchedProjects[0].id;
+    if (orgMatched.length) select.value = orgMatched[0].id;
   }
 
   els.sessionActions.hidden = !auth && !active;
@@ -233,12 +279,20 @@ els.lockBtn?.addEventListener("click", async () => {
   render();
 });
 
+els.orgSelect?.addEventListener("change", async () => {
+  await saveActiveOrg(els.orgSelect.value);
+  render();
+});
+
 els.contributorSelect?.addEventListener("change", async () => {
   const v = els.contributorSelect.value;
   if (v === "__other__") {
     els.contributorCustom.style.display = "";
     els.contributorCustom.focus();
-    await saveContributor({ kind: "custom", value: els.contributorCustom.value || "" });
+    await saveContributor({
+      kind: "custom",
+      value: els.contributorCustom.value || "",
+    });
   } else {
     els.contributorCustom.style.display = "none";
     await saveContributor({ kind: "preset", value: v });
@@ -247,7 +301,10 @@ els.contributorSelect?.addEventListener("change", async () => {
 
 els.contributorCustom?.addEventListener("input", async () => {
   if (els.contributorSelect.value !== "__other__") return;
-  await saveContributor({ kind: "custom", value: els.contributorCustom.value || "" });
+  await saveContributor({
+    kind: "custom",
+    value: els.contributorCustom.value || "",
+  });
 });
 
 els.toggleBtn?.addEventListener("click", async () => {
@@ -267,7 +324,9 @@ els.toggleBtn?.addEventListener("click", async () => {
   const projectId = els.projectSelect?.value || "";
   let meta = { contributorName };
   if (projectId && auth) {
-    const proj = [...matchedProjects, ...allProjects].find((p) => p.id === projectId);
+    const proj = [...matchedProjects, ...allProjects].find(
+      (p) => p.id === projectId
+    );
     try {
       const { session: cloudSession } = await ffCreateSession({
         projectId,
@@ -305,7 +364,9 @@ els.copyBtn?.addEventListener("click", async () => {
 
 els.dashBtn?.addEventListener("click", async () => {
   if (!auth?.apiUrl) return;
-  const slug = auth.orgs?.[0]?.slug;
+  const orgs = auth.orgs || [];
+  const slug =
+    orgs.find((o) => o.id === activeOrgId)?.slug || orgs[0]?.slug || "";
   const url = slug ? `${auth.apiUrl}/${slug}/inbox` : `${auth.apiUrl}/`;
   await chrome.tabs.create({ url });
 });

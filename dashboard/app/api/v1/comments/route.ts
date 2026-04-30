@@ -56,6 +56,10 @@ export async function POST(req: NextRequest) {
   const elementText = (form.get("text") as string) || null;
   const viewportWidth = Number(form.get("viewportWidth")) || null;
   const viewportHeight = Number(form.get("viewportHeight")) || null;
+  const rawPriority = (form.get("priority") as string) || "";
+  const priority = ["low", "normal", "high", "urgent"].includes(rawPriority)
+    ? rawPriority
+    : "normal";
   let elementRect: { x: number; y: number; width: number; height: number } | null = null;
   try {
     const rectStr = form.get("elementRect") as string;
@@ -79,6 +83,7 @@ export async function POST(req: NextRequest) {
     screenshotPath,
     screenshotWidth,
     screenshotHeight,
+    priority,
   });
 
   return json({ comment: { id, sessionId, projectId, createdAt: new Date().toISOString() } });

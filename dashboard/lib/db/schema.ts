@@ -143,6 +143,23 @@ export const project = pgTable(
   })
 );
 
+export const projectMember = pgTable(
+  "project_member",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    projUserIdx: index("project_member_proj_user_idx").on(t.projectId, t.userId),
+  })
+);
+
 export const feedbackSession = pgTable("feedback_session", {
   id: text("id").primaryKey(),
   projectId: text("project_id")

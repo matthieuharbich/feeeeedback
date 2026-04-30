@@ -62,6 +62,7 @@ async function ffCreateComment({
   screenshotBlob,
   screenshotWidth,
   screenshotHeight,
+  priority,
 }) {
   const fd = new FormData();
   fd.append("sessionId", sessionId);
@@ -75,6 +76,7 @@ async function ffCreateComment({
   if (viewportWidth) fd.append("viewportWidth", String(viewportWidth));
   if (viewportHeight) fd.append("viewportHeight", String(viewportHeight));
   if (elementRect) fd.append("elementRect", JSON.stringify(elementRect));
+  if (priority) fd.append("priority", priority);
   if (screenshotBlob) {
     fd.append("screenshot", screenshotBlob, "screenshot.png");
     if (screenshotWidth) fd.append("screenshotWidth", String(screenshotWidth));

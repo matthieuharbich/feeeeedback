@@ -3,6 +3,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { project, comment } from "@/lib/db/schema";
 import { requireSession, getOrgBySlug } from "@/lib/server/session";
+import { getProjectScope } from "@/lib/server/access";
 import { Plus, FolderKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,11 +15,13 @@ export default async function ProjectsPage({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  await requireSession();
+  const session = await requireSession();
   const org = await getOrgBySlug(orgSlug);
   if (!org) return null;
 
-  const projects = await db
+  const scope = await getProjectScope(session.user.id, org.id);
+
+  const all = await db
     .select({
       id: project.id,
       name: project.name,
@@ -31,6 +34,9 @@ export default async function ProjectsPage({
     .from(project)
     .where(eq(project.organizationId, org.id))
     .orderBy(desc(project.createdAt));
+  const projects = scope.all
+    ? all
+    : all.filter((p) => scope.projectIds.includes(p.id));
 
   return (
     <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">

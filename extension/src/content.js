@@ -131,6 +131,11 @@
         <div class="ff-panel-text"></div>
       </div>
       <textarea class="ff-panel-textarea" placeholder="Ton commentaire…" rows="4"></textarea>
+      <div class="ff-importance" role="radiogroup" aria-label="Importance">
+        <button type="button" class="ff-imp" data-ff-imp="low">Pas important</button>
+        <button type="button" class="ff-imp ff-imp-active" data-ff-imp="high">Important</button>
+        <button type="button" class="ff-imp" data-ff-imp="urgent">Super important</button>
+      </div>
       <div class="ff-panel-actions">
         <button class="ff-btn ff-btn-ghost" data-ff-cancel>Annuler</button>
         <button class="ff-btn ff-btn-primary" data-ff-save>Enregistrer</button>
@@ -144,6 +149,16 @@
 
     const textarea = panelEl.querySelector(".ff-panel-textarea");
     textarea.focus();
+
+    let importance = "high";
+    panelEl.querySelectorAll("[data-ff-imp]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        importance = btn.getAttribute("data-ff-imp");
+        panelEl
+          .querySelectorAll("[data-ff-imp]")
+          .forEach((b) => b.classList.toggle("ff-imp-active", b === btn));
+      });
+    });
 
     panelEl.querySelector("[data-ff-close]").addEventListener("click", () => closeCommentPanel(true));
     panelEl.querySelector("[data-ff-cancel]").addEventListener("click", () => closeCommentPanel(true));
@@ -168,6 +183,7 @@
           selector,
           text,
           comment,
+          priority: importance,
           tagName: target.tagName.toLowerCase(),
           url: location.href,
           pageTitle: document.title,
@@ -263,6 +279,7 @@
         viewportWidth: data.viewportWidth,
         viewportHeight: data.viewportHeight,
         elementRect: data.elementRect,
+        priority: data.priority,
         screenshotBlob,
         screenshotWidth,
         screenshotHeight,

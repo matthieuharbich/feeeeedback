@@ -4,6 +4,7 @@ import { authenticateApi, json, optionsResponse } from "@/lib/server/api-auth";
 import { db } from "@/lib/db";
 import { member, organization, project } from "@/lib/db/schema";
 import { nid, slugify } from "@/lib/server/ids";
+import { getProjectScope } from "@/lib/server/access";
 
 export const OPTIONS = () => optionsResponse();
 
@@ -19,18 +20,53 @@ export async function GET(req: NextRequest) {
   const orgIds = orgRows.map((r) => r.id);
   if (!orgIds.length) return json({ projects: [] });
 
-  const projects = await db
-    .select({
-      id: project.id,
-      name: project.name,
-      slug: project.slug,
-      color: project.color,
-      urlPatterns: project.urlPatterns,
-      organizationId: project.organizationId,
-    })
-    .from(project)
-    .where(inArray(project.organizationId, orgIds))
-    .orderBy(project.name);
+  // Compute per-org scope; concatenate accessible project IDs.
+  const accessibleIds = new Set<string>();
+  let allOrgsAdmin = true;
+  for (const orgId of orgIds) {
+    const scope = await getProjectScope(ctx.user.id, orgId);
+    if (scope.all) continue;
+    allOrgsAdmin = false;
+    for (const id of scope.projectIds) accessibleIds.add(id);
+  }
+
+  let projects;
+  if (allOrgsAdmin) {
+    projects = await db
+      .select({
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        color: project.color,
+        urlPatterns: project.urlPatterns,
+        organizationId: project.organizationId,
+      })
+      .from(project)
+      .where(inArray(project.organizationId, orgIds))
+      .orderBy(project.name);
+  } else {
+    // Mix of admin orgs (sees all) + restricted orgs (sees only assigned)
+    const adminOrgIds: string[] = [];
+    for (const orgId of orgIds) {
+      const scope = await getProjectScope(ctx.user.id, orgId);
+      if (scope.all) adminOrgIds.push(orgId);
+    }
+    const all = await db
+      .select({
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        color: project.color,
+        urlPatterns: project.urlPatterns,
+        organizationId: project.organizationId,
+      })
+      .from(project)
+      .where(inArray(project.organizationId, orgIds))
+      .orderBy(project.name);
+    projects = all.filter(
+      (p) => adminOrgIds.includes(p.organizationId) || accessibleIds.has(p.id)
+    );
+  }
 
   return json({ projects });
 }
@@ -57,6 +93,9 @@ export async function POST(req: NextRequest) {
     .where(and(eq(member.userId, ctx.user.id), eq(member.organizationId, org.id)))
     .limit(1);
   if (!mem[0]) return json({ error: "not a member" }, 403);
+  if (mem[0].role !== "owner" && mem[0].role !== "admin") {
+    return json({ error: "owner/admin only" }, 403);
+  }
 
   const finalSlug = slugify(inputSlug || name);
   const id = nid();

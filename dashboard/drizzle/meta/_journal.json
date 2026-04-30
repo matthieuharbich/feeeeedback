@@ -29,6 +29,13 @@
       "when": 1777298442236,
       "tag": "0003_happy_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777538142930,
+      "tag": "0004_clever_thunderbird",
+      "breakpoints": true
     }
   ]
 }

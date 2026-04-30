@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { comment, feedbackSession, project, user } from "@/lib/db/schema";
 import Link from "next/link";
 import { requireSession, getOrgBySlug } from "@/lib/server/session";
+import { getProjectScope } from "@/lib/server/access";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Inbox } from "lucide-react";
@@ -16,15 +17,21 @@ export default async function InboxPage({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  await requireSession();
+  const session = await requireSession();
   const org = await getOrgBySlug(orgSlug);
   if (!org) return null;
 
-  const projects = await db
+  const scope = await getProjectScope(session.user.id, org.id);
+
+  const allProjects = await db
     .select({ id: project.id, name: project.name, slug: project.slug, color: project.color })
     .from(project)
     .where(eq(project.organizationId, org.id))
     .orderBy(project.name);
+
+  const projects = scope.all
+    ? allProjects
+    : allProjects.filter((p) => scope.projectIds.includes(p.id));
 
   if (!projects.length) {
     return (
