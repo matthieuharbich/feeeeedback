@@ -1,6 +1,3 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { project } from "@/lib/db/schema";
 import { requireSession, getOrgBySlug } from "@/lib/server/session";
 import { userIsOrgOwner } from "@/lib/server/access";
 import { PageHeader } from "@/components/page-header";
@@ -18,13 +15,6 @@ export default async function MembersPage({
   if (!org) return null;
 
   const isAdmin = await userIsOrgOwner(session.user.id, org.id);
-
-  const projects = await db
-    .select({ id: project.id, slug: project.slug, name: project.name, color: project.color })
-    .from(project)
-    .where(eq(project.organizationId, org.id))
-    .orderBy(project.name);
-
   if (!isAdmin) {
     return (
       <div className="px-6 md:px-10 py-8 max-w-4xl mx-auto">
@@ -39,11 +29,5 @@ export default async function MembersPage({
     );
   }
 
-  return (
-    <MembersClient
-      orgSlug={orgSlug}
-      projects={projects}
-      currentUserId={session.user.id}
-    />
-  );
+  return <MembersClient orgSlug={orgSlug} currentUserId={session.user.id} />;
 }

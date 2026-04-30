@@ -13,8 +13,8 @@ import { nid } from "@/lib/server/ids";
 
 export const OPTIONS = () => optionsResponse();
 
-// PATCH { orgSlug, projectSlugs[] } — replace the user's project access
-// for the given org. Owner/admin only.
+// PATCH { orgSlug, projectSlugs?[], role? } — replace the user's project
+// access for the given org and optionally change the role. Owner/admin only.
 export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
@@ -25,9 +25,14 @@ export async function PATCH(
   const { id: targetUserId } = await ctx.params;
   const body = await req.json().catch(() => ({}));
   const orgSlug = String(body?.orgSlug || "");
-  const projectSlugs: string[] = Array.isArray(body?.projectSlugs)
+  const role: string | undefined = ["member", "admin", "owner"].includes(
+    body?.role
+  )
+    ? body.role
+    : undefined;
+  const projectSlugs: string[] | undefined = Array.isArray(body?.projectSlugs)
     ? body.projectSlugs
-    : [];
+    : undefined;
   if (!orgSlug) return json({ error: "orgSlug required" }, 400);
 
   const orgRows = await db
@@ -54,34 +59,42 @@ export async function PATCH(
     .limit(1);
   if (!targetMem[0]) return json({ error: "user not in org" }, 404);
 
-  const projects = await db
-    .select({ id: project.id, slug: project.slug })
-    .from(project)
-    .where(eq(project.organizationId, org.id));
-  const desiredIds = projects
-    .filter((p) => projectSlugs.includes(p.slug))
-    .map((p) => p.id);
-  const projectIdsForOrg = projects.map((p) => p.id);
-
-  // Remove existing org-scoped links for this user
-  if (projectIdsForOrg.length) {
+  if (role && role !== targetMem[0].role) {
     await db
-      .delete(projectMember)
-      .where(
-        and(
-          eq(projectMember.userId, targetUserId),
-          inArray(projectMember.projectId, projectIdsForOrg)
-        )
-      );
+      .update(member)
+      .set({ role })
+      .where(eq(member.id, targetMem[0].id));
   }
 
-  for (const pid of desiredIds) {
-    await db
-      .insert(projectMember)
-      .values({ id: nid(), projectId: pid, userId: targetUserId });
+  if (projectSlugs !== undefined) {
+    const projects = await db
+      .select({ id: project.id, slug: project.slug })
+      .from(project)
+      .where(eq(project.organizationId, org.id));
+    const desiredIds = projects
+      .filter((p) => projectSlugs.includes(p.slug))
+      .map((p) => p.id);
+    const projectIdsForOrg = projects.map((p) => p.id);
+
+    if (projectIdsForOrg.length) {
+      await db
+        .delete(projectMember)
+        .where(
+          and(
+            eq(projectMember.userId, targetUserId),
+            inArray(projectMember.projectId, projectIdsForOrg)
+          )
+        );
+    }
+
+    for (const pid of desiredIds) {
+      await db
+        .insert(projectMember)
+        .values({ id: nid(), projectId: pid, userId: targetUserId });
+    }
   }
 
-  return json({ ok: true, projects: projectSlugs });
+  return json({ ok: true, role, projects: projectSlugs });
 }
 
 // DELETE removes the user from the org entirely.
