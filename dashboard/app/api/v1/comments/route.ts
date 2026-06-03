@@ -66,6 +66,17 @@ export async function POST(req: NextRequest) {
     if (rectStr) elementRect = JSON.parse(rectStr);
   } catch {}
 
+  // Optional clipboard-pasted attachments (feedbackAttachment_0, …)
+  const attachments: Array<{ path: string; kind: "feedback" | "action"; addedAt: string }> = [];
+  for (const [k, v] of form.entries()) {
+    if (!k.startsWith("feedbackAttachment_") || !(v instanceof File)) continue;
+    if (v.size === 0 || v.size > 6 * 1024 * 1024) continue; // skip 0 or >6 MB
+    const aid = nid();
+    const buffer = Buffer.from(await v.arrayBuffer());
+    const path = await saveScreenshot(aid, buffer);
+    attachments.push({ path, kind: "feedback", addedAt: new Date().toISOString() });
+  }
+
   await db.insert(comment).values({
     id,
     sessionId,
@@ -84,6 +95,7 @@ export async function POST(req: NextRequest) {
     screenshotWidth,
     screenshotHeight,
     priority,
+    attachments,
   });
 
   return json({ comment: { id, sessionId, projectId, createdAt: new Date().toISOString() } });

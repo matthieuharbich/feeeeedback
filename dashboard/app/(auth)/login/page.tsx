@@ -43,16 +43,16 @@ function LoginForm() {
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight text-center mb-1">
-        Se connecter
+        Sign in
       </h1>
       <p className="text-sm text-muted-foreground text-center mb-8">
-        Pseudo et mot de passe.
+        Username and password.
       </p>
 
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="identifier" className="sr-only">
-            Pseudo
+            Username
           </Label>
           <Input
             id="identifier"
@@ -61,13 +61,13 @@ function LoginForm() {
             autoComplete="username"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="Pseudo (ex. Tony)"
+            placeholder="Username (e.g. Tony)"
             autoFocus
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password" className="sr-only">
-            Mot de passe
+            Password
           </Label>
           <Input
             id="password"
@@ -76,7 +76,7 @@ function LoginForm() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Mot de passe"
+            placeholder="Password"
           />
         </div>
         <Button
@@ -85,7 +85,7 @@ function LoginForm() {
           className="w-full"
         >
           {loading && <Loader2 className="size-4 animate-spin" />}
-          Se connecter
+          Sign in
         </Button>
         {error && (
           <p className="text-sm text-destructive text-center">{error}</p>
@@ -106,7 +106,7 @@ export default function LoginPage() {
         <Suspense
           fallback={
             <div className="text-center text-sm text-muted-foreground">
-              Chargement…
+              Loading…
             </div>
           }
         >

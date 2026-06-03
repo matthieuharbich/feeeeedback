@@ -36,17 +36,17 @@ export default async function InboxPage({
   if (!projects.length) {
     return (
       <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
-        <PageHeader title="Inbox" description="Aucun retour pour l'instant" />
+        <PageHeader title="Inbox" description="No feedback yet" />
         <Card className="p-16 text-center mt-8">
           <div className="size-12 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
             <Inbox className="size-5" />
           </div>
-          <h3 className="text-lg font-medium mb-2">Aucun projet</h3>
+          <h3 className="text-lg font-medium mb-2">No projects</h3>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-            Crée un projet pour commencer à capturer des retours depuis l'extension.
+            Create a project to start capturing feedback from the extension.
           </p>
           <Button asChild>
-            <Link href={`/${orgSlug}/projects/new`}>Créer un projet</Link>
+            <Link href={`/${orgSlug}/projects/new`}>Create a project</Link>
           </Button>
         </Card>
       </div>
@@ -72,6 +72,7 @@ export default async function InboxPage({
       status: comment.status,
       priority: comment.priority,
       actionNote: comment.actionNote,
+      attachments: comment.attachments,
       resolvedAt: comment.resolvedAt,
       createdAt: comment.createdAt,
       projectId: comment.projectId,

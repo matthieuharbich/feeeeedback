@@ -143,9 +143,9 @@ export function MembersClient({
   if (loading) {
     return (
       <div className="px-6 md:px-10 py-8 max-w-5xl mx-auto">
-        <PageHeader title="Membres" />
+        <PageHeader title="Members" />
         <Card className="p-10 text-center text-sm text-muted-foreground mt-8">
-          Chargement…
+          Loading…
         </Card>
       </div>
     );
@@ -154,19 +154,19 @@ export function MembersClient({
   return (
     <div className="px-6 md:px-10 py-8 max-w-5xl mx-auto">
       <PageHeader
-        title="Membres"
-        description={`${users.length} utilisateur${users.length > 1 ? "s" : ""} sur ${orgs.length} organisation${orgs.length > 1 ? "s" : ""}`}
+        title="Members"
+        description={`${users.length} user${users.length > 1 ? "s" : ""} across ${orgs.length} organization${orgs.length > 1 ? "s" : ""}`}
       />
 
       <Card className="p-5 mt-8">
         <h2 className="font-medium text-sm mb-3 flex items-center gap-2">
           <UserPlus className="size-4" />
-          Créer un membre
+          Create a member
         </h2>
         <form onSubmit={createUser} className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="m-name">Pseudo</Label>
+              <Label htmlFor="m-name">Username</Label>
               <Input
                 id="m-name"
                 required
@@ -176,20 +176,20 @@ export function MembersClient({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="m-pass">Mot de passe</Label>
+              <Label htmlFor="m-pass">Password</Label>
               <Input
                 id="m-pass"
                 required
                 type="text"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="ex. serena"
+                placeholder="e.g. serena"
               />
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Organisation</Label>
+              <Label>Organization</Label>
               <Select value={createOrgSlug} onValueChange={(v) => v && setCreateOrgSlug(v)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -204,7 +204,7 @@ export function MembersClient({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Rôle</Label>
+              <Label>Role</Label>
               <Select
                 value={createRole}
                 onValueChange={(v) => v && setCreateRole(v)}
@@ -213,16 +213,16 @@ export function MembersClient({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="member">Member (accès limité)</SelectItem>
-                  <SelectItem value="admin">Admin (gère l&apos;org)</SelectItem>
-                  <SelectItem value="owner">Owner (admin + propriétaire)</SelectItem>
+                  <SelectItem value="member">Member (limited access)</SelectItem>
+                  <SelectItem value="admin">Admin (manages org)</SelectItem>
+                  <SelectItem value="owner">Owner (admin + ownership)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           {createRole === "member" && currentOrgProjects.length > 0 && (
             <div>
-              <Label className="mb-1.5 block">Projets accessibles</Label>
+              <Label className="mb-1.5 block">Accessible projects</Label>
               <div className="flex flex-wrap gap-1.5">
                 {currentOrgProjects.map((p) => {
                   const active = createProjects.has(p.slug);
@@ -255,14 +255,14 @@ export function MembersClient({
                 })}
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                Pour les rôles admin/owner, l&apos;accès projet est implicite — pas besoin de sélectionner.
+                For admin/owner roles, project access is implicit — no need to select.
               </p>
             </div>
           )}
           <div>
             <Button type="submit" disabled={creating || !name || !password}>
               {creating && <Loader2 className="size-4 animate-spin" />}
-              Créer
+              Create
             </Button>
             {createError && (
               <span className="text-sm text-destructive ml-3">{createError}</span>
@@ -272,7 +272,7 @@ export function MembersClient({
       </Card>
 
       <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mt-10 mb-2">
-        Utilisateurs ({users.length})
+        Users ({users.length})
       </h2>
       <Card className="p-0 overflow-hidden divide-y">
         {users.map((u) => (
@@ -287,7 +287,7 @@ export function MembersClient({
         ))}
         {!users.length && (
           <div className="p-10 text-center text-sm text-muted-foreground">
-            Aucun utilisateur
+            No users
           </div>
         )}
       </Card>
@@ -339,7 +339,7 @@ function UserRow({
   }
 
   async function removeFromOrg(orgSlug: string) {
-    if (!confirm(`Retirer ${u.name} de l'organisation ?`)) return;
+    if (!confirm(`Remove ${u.name} from the organization?`)) return;
     setBusy(`del-${orgSlug}`);
     await fetch(
       `/api/v1/admin/users/${u.userId}?orgSlug=${encodeURIComponent(orgSlug)}`,
@@ -372,7 +372,7 @@ function UserRow({
             <span className="text-sm font-medium">{u.name}</span>
             {isCurrent && (
               <Badge variant="outline" className="h-5 text-muted-foreground">
-                toi
+                you
               </Badge>
             )}
             {displayEmail && (
@@ -419,14 +419,14 @@ function UserRow({
                     onClick={() => addToOrg(addingOrg)}
                     disabled={busy?.startsWith("add-")}
                   >
-                    Ajouter
+                    Add
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => setAddingOrg(null)}
                   >
-                    Annuler
+                    Cancel
                   </Button>
                 </>
               ) : (
@@ -437,7 +437,7 @@ function UserRow({
                   onClick={() => setAddingOrg(otherOrgs[0]?.slug || null)}
                 >
                   <Plus className="size-3.5" />
-                  Ajouter à une autre org
+                  Add to another org
                 </Button>
               )}
             </div>
@@ -519,7 +519,7 @@ function OrgMembershipBlock({
               variant="ghost"
               onClick={onRemove}
               disabled={delBusy}
-              title={`Retirer de ${m.orgName}`}
+              title={`Remove from ${m.orgName}`}
               className="text-muted-foreground hover:text-destructive"
             >
               <X className="size-3.5" />
@@ -532,7 +532,7 @@ function OrgMembershipBlock({
         <div className="mt-2.5">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              Projets accessibles
+              Accessible projects
             </span>
             {dirty && (
               <Button
@@ -546,7 +546,7 @@ function OrgMembershipBlock({
                 ) : (
                   <Save className="size-3" />
                 )}
-                Enregistrer
+                Save
               </Button>
             )}
           </div>
@@ -579,7 +579,7 @@ function OrgMembershipBlock({
 
       {isElevated && (
         <div className="text-xs text-muted-foreground mt-2">
-          Voit tous les projets ({m.role}).
+          Sees all projects ({m.role}).
         </div>
       )}
     </div>

@@ -69,19 +69,19 @@ export default function NewProjectPage({
     <div className="px-6 md:px-10 py-8 max-w-2xl mx-auto">
       <Button asChild variant="ghost" size="sm" className="mb-4 -ml-3">
         <Link href={`/${orgSlug}/projects`}>
-          <ArrowLeft className="size-4" /> Projets
+          <ArrowLeft className="size-4" /> Projects
         </Link>
       </Button>
 
       <PageHeader
-        title="Nouveau projet"
-        description="Rattache un projet à une ou plusieurs URL. L'extension pré-sélectionnera ce projet quand tu visites une page qui matche."
+        title="New project"
+        description="Attach a project to one or more URLs. The extension will pre-select this project when you visit a matching page."
       />
 
       <Card className="p-6 mt-8">
         <form onSubmit={onSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="name">Nom</Label>
+            <Label htmlFor="name">Name</Label>
             <Input
               id="name"
               required
@@ -90,7 +90,7 @@ export default function NewProjectPage({
                 setName(e.target.value);
                 if (!slugTouched) setSlug(slugify(e.target.value));
               }}
-              placeholder="Mon site"
+              placeholder="My site"
               autoFocus
             />
           </div>
@@ -115,18 +115,18 @@ export default function NewProjectPage({
               id="patterns"
               value={patterns}
               onChange={(e) => setPatterns(e.target.value)}
-              placeholder="*.exemple.com/**"
+              placeholder="*.example.com/**"
               rows={4}
               className="font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              Une par ligne. <code>*</code> = tout sauf /, <code>**</code> = tout. Ex :{" "}
+              One per line. <code>*</code> = anything except /, <code>**</code> = anything. Example:{" "}
               <code>*.mtth.world/**</code>
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="color">Couleur</Label>
+            <Label htmlFor="color">Color</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="color"
@@ -146,7 +146,7 @@ export default function NewProjectPage({
           <div className="flex items-center gap-2 pt-2">
             <Button type="submit" disabled={loading || !name} className="flex-1">
               {loading && <Loader2 className="size-4 animate-spin" />}
-              Créer le projet
+              Create project
             </Button>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}

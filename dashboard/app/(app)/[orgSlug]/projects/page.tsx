@@ -41,13 +41,13 @@ export default async function ProjectsPage({
   return (
     <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
       <PageHeader
-        title="Projets"
-        description={`${projects.length} projet${projects.length > 1 ? "s" : ""}`}
+        title="Projects"
+        description={`${projects.length} project${projects.length > 1 ? "s" : ""}`}
         actions={
           <Button asChild>
             <Link href={`/${orgSlug}/projects/new`}>
               <Plus className="size-4" />
-              Nouveau projet
+              New project
             </Link>
           </Button>
         }
@@ -58,12 +58,12 @@ export default async function ProjectsPage({
           <div className="size-12 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
             <FolderKanban className="size-5" />
           </div>
-          <h3 className="text-lg font-medium mb-2">Aucun projet</h3>
+          <h3 className="text-lg font-medium mb-2">No projects</h3>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-            Crée un projet pour grouper tes retours et les rattacher à des URLs.
+            Create a project to group your feedback and attach URL patterns.
           </p>
           <Button asChild>
-            <Link href={`/${orgSlug}/projects/new`}>Créer un projet</Link>
+            <Link href={`/${orgSlug}/projects/new`}>Create a project</Link>
           </Button>
         </Card>
       ) : (
@@ -83,12 +83,12 @@ export default async function ProjectsPage({
                       style={{ background: p.color }}
                     />
                     <span className="text-sm text-muted-foreground">
-                      {p.commentCount} retour{p.commentCount > 1 ? "s" : ""}
+                      {p.commentCount} feedback{p.commentCount > 1 ? "s" : ""}
                     </span>
                   </div>
                   <h3 className="font-semibold truncate">{p.name}</h3>
                   <p className="text-xs text-muted-foreground font-mono truncate mt-1">
-                    {patterns[0] || "(pas de pattern)"}
+                    {patterns[0] || "(no pattern)"}
                     {patterns.length > 1 && ` +${patterns.length - 1}`}
                   </p>
                 </Card>

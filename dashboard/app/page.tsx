@@ -27,7 +27,7 @@ export default async function Home() {
             </Link>
           </Button>
           <Button asChild size="sm">
-            <Link href="/login">Se connecter</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
       </header>
@@ -36,25 +36,25 @@ export default async function Home() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--brand)]" />
-            Extension Chrome · multi-projet · team
+            Chrome extension · multi-project · team
           </div>
           <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
-            Le feedback visuel, <br />
+            Visual feedback, <br />
             <span className="text-[color:var(--brand)]">simple</span>.
           </h1>
           <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
-            Pointe un élément d'une page live, ajoute un commentaire, partage
-            avec ton équipe. Tout revient dans un dashboard unique, par projet,
-            par personne, avec capture d'écran.
+            Point at an element on a live page, add a comment, share with your
+            team. Everything lands in a single dashboard, by project, by person,
+            with a screenshot.
           </p>
           <div className="mt-10 flex items-center justify-center gap-3 flex-wrap">
             <Button asChild size="lg">
               <Link href="/login">
-                Commencer <ArrowRight className="size-4" />
+                Get started <ArrowRight className="size-4" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/install">Installer l'extension</Link>
+              <Link href="/install">Install the extension</Link>
             </Button>
           </div>
         </div>
@@ -70,7 +70,7 @@ export default async function Home() {
             GitHub
           </a>
           <Link href="/privacy" className="hover:text-foreground">
-            Confidentialité
+            Privacy
           </Link>
         </div>
       </footer>

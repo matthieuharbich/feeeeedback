@@ -19,11 +19,11 @@ export default async function MembersPage({
     return (
       <div className="px-6 md:px-10 py-8 max-w-4xl mx-auto">
         <PageHeader
-          title="Membres"
-          description="Réservé aux administrateurs de l'organisation."
+          title="Members"
+          description="Reserved for organization administrators."
         />
         <Card className="p-10 text-center mt-8 text-sm text-muted-foreground">
-          Seul un admin peut gérer les membres et leurs accès.
+          Only an admin can manage members and their access.
         </Card>
       </div>
     );

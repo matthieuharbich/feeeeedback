@@ -52,10 +52,10 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <h1 className="text-3xl font-semibold tracking-tight mb-2">
-            Crée ton organisation
+            Create your organization
           </h1>
           <p className="text-sm text-muted-foreground">
-            Une organisation regroupe tes projets et tes membres.
+            An organization groups your projects and members.
           </p>
         </div>
 
@@ -64,7 +64,7 @@ export default function OnboardingPage() {
           className="bg-card border rounded-xl p-6 space-y-5 shadow-sm"
         >
           <div className="space-y-2">
-            <Label htmlFor="name">Nom</Label>
+            <Label htmlFor="name">Name</Label>
             <Input
               id="name"
               required
@@ -102,7 +102,7 @@ export default function OnboardingPage() {
             className="w-full"
           >
             {loading && <Loader2 className="size-4 animate-spin" />}
-            Créer l'organisation
+            Create organization
           </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>

@@ -77,8 +77,8 @@ function Sidebar({
   const navItems = currentOrg?.slug
     ? [
         { href: `/${currentOrg.slug}/inbox`, label: "Inbox", icon: Inbox },
-        { href: `/${currentOrg.slug}/projects`, label: "Tous les projets", icon: FolderKanban },
-        { href: `/${currentOrg.slug}/members`, label: "Membres", icon: Users },
+        { href: `/${currentOrg.slug}/projects`, label: "All projects", icon: FolderKanban },
+        { href: `/${currentOrg.slug}/members`, label: "Members", icon: Users },
       ]
     : [];
 
@@ -119,12 +119,12 @@ function Sidebar({
           <>
             <div className="flex items-center justify-between px-2 mb-1 mt-6">
               <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Projets
+                Projects
               </span>
               <Link
                 href={`/${currentOrg.slug}/projects/new`}
                 className="text-muted-foreground hover:text-sidebar-accent-foreground"
-                title="Nouveau projet"
+                title="New project"
               >
                 <Plus size={13} />
               </Link>
@@ -155,7 +155,7 @@ function Sidebar({
         )}
 
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium px-2 mb-1 mt-6">
-          Ressources
+          Resources
         </div>
         <Link
           href="/install"
@@ -221,7 +221,7 @@ function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
           <div className="text-[11px] text-muted-foreground truncate">
             {currentOrg?.slug
               ? `feeeeedback.mtth.world/${currentOrg.slug}`
-              : "Choisir une organisation"}
+              : "Choose an organization"}
           </div>
         </div>
         <ChevronsUpDown size={14} className="text-muted-foreground flex-shrink-0" />
@@ -229,7 +229,7 @@ function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
       {open && (
         <div className="absolute left-0 top-full mt-1 w-56 bg-popover text-popover-foreground rounded-lg shadow-lg ring-1 ring-foreground/10 py-1 z-50">
           <div className="px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-            Organisations
+            Organizations
           </div>
           {orgs.map((o) => (
             <button
@@ -252,7 +252,7 @@ function OrgSwitcher({ orgs, currentOrg }: { orgs: Org[]; currentOrg?: Org }) {
             className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1 text-muted-foreground"
           >
             <Plus size={13} />
-            Nouvelle organisation
+            New organization
           </button>
         </div>
       )}
@@ -310,7 +310,7 @@ function UserMenu({ user, currentOrgSlug }: { user: User; currentOrgSlug?: strin
               className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1"
             >
               <Users size={13} />
-              Membres
+              Members
             </button>
           )}
           <button
@@ -319,7 +319,7 @@ function UserMenu({ user, currentOrgSlug }: { user: User; currentOrgSlug?: strin
             className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1"
           >
             <Puzzle size={13} />
-            Télécharger l'extension
+            Download extension
           </button>
           <div className="my-1 border-t" />
           <button
@@ -328,7 +328,7 @@ function UserMenu({ user, currentOrgSlug }: { user: User; currentOrgSlug?: strin
             className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted rounded-md mx-1 text-destructive"
           >
             <LogOut size={13} />
-            Se déconnecter
+            Sign out
           </button>
         </div>
       )}

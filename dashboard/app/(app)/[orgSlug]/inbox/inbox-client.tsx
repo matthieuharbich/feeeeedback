@@ -47,6 +47,7 @@ type Comment = {
   status: string;
   priority: string;
   actionNote: string | null;
+  attachments: Array<{ path: string; kind: "feedback" | "action"; addedAt: string }>;
   resolvedAt: string | null;
   createdAt: string;
   projectId: string;
@@ -61,10 +62,10 @@ type View = "grid" | "list";
 type StatusFilter = "open" | "in_progress" | "resolved" | "archived" | "all";
 
 const STATUS_LABELS: Record<string, string> = {
-  open: "Ouvert",
-  in_progress: "En cours",
-  resolved: "Résolu",
-  archived: "Archivé",
+  open: "Open",
+  in_progress: "In progress",
+  resolved: "Resolved",
+  archived: "Archived",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -75,9 +76,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
-  low: "Faible",
-  normal: "Normale",
-  high: "Haute",
+  low: "Low",
+  normal: "Normal",
+  high: "High",
   urgent: "Urgent",
 };
 
@@ -103,10 +104,16 @@ export function InboxClient({
   orgSlug,
   projects,
   comments,
+  lockedProjectSlug,
+  pageTitle,
+  pageDescription,
 }: {
   orgSlug: string;
   projects: Project[];
   comments: Comment[];
+  lockedProjectSlug?: string;
+  pageTitle?: string;
+  pageDescription?: React.ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -152,6 +159,12 @@ export function InboxClient({
     updateParam(key, next.length ? next.join(",") : null);
   }
 
+  // When scoped to a single project, force the projects URL filter
+  // to that one and ignore any external value.
+  const effectiveProjectsSel = lockedProjectSlug
+    ? [lockedProjectSlug]
+    : projectsSel;
+
   const contributors = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of comments) {
@@ -191,7 +204,11 @@ export function InboxClient({
   const filtered = useMemo(() => {
     const qLower = qParam.toLowerCase();
     return statusFiltered
-      .filter((c) => (projectsSel.length ? projectsSel.includes(c.projectSlug) : true))
+      .filter((c) =>
+        effectiveProjectsSel.length
+          ? effectiveProjectsSel.includes(c.projectSlug)
+          : true
+      )
       .filter((c) =>
         contributorsSel.length
           ? contributorsSel.includes((c.contributorName || "").trim())
@@ -212,7 +229,7 @@ export function InboxClient({
       .sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-  }, [statusFiltered, qParam, projectsSel, contributorsSel, urlsSel]);
+  }, [statusFiltered, qParam, effectiveProjectsSel, contributorsSel, urlsSel]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = activeId ? filtered.find((c) => c.id === activeId) || null : null;
@@ -254,19 +271,21 @@ export function InboxClient({
 
   const hasFilters =
     !!qParam ||
-    projectsSel.length > 0 ||
+    (!lockedProjectSlug && projectsSel.length > 0) ||
     contributorsSel.length > 0 ||
     urlsSel.length > 0;
 
   return (
     <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
       <PageHeader
-        title="Inbox"
+        title={pageTitle ?? "Inbox"}
         description={
-          <>
-            {filtered.length} retour{filtered.length > 1 ? "s" : ""}
-            {hasFilters && ` · ${comments.length} au total`}
-          </>
+          pageDescription ?? (
+            <>
+              {filtered.length} feedback{filtered.length > 1 ? "s" : ""}
+              {hasFilters && ` · ${comments.length} total`}
+            </>
+          )
         }
         actions={
           <div className="flex items-center gap-1 border rounded-md p-0.5 bg-background">
@@ -275,7 +294,7 @@ export function InboxClient({
               variant={viewParam === "grid" ? "secondary" : "ghost"}
               className="h-7 w-7"
               onClick={() => updateParam("view", null)}
-              title="Grille"
+              title="Grid"
             >
               <LayoutGrid className="size-4" />
             </Button>
@@ -284,7 +303,7 @@ export function InboxClient({
               variant={viewParam === "list" ? "secondary" : "ghost"}
               className="h-7 w-7"
               onClick={() => updateParam("view", "list")}
-              title="Liste"
+              title="List"
             >
               <Rows3 className="size-4" />
             </Button>
@@ -300,7 +319,7 @@ export function InboxClient({
         >
           <TabsList>
             <TabsTrigger value="open">
-              Ouverts
+              Open
               {statusCounts.open > 0 && (
                 <span className="ml-1.5 text-xs tabular-nums opacity-60">
                   {statusCounts.open}
@@ -308,7 +327,7 @@ export function InboxClient({
               )}
             </TabsTrigger>
             <TabsTrigger value="in_progress">
-              En cours
+              In progress
               {statusCounts.in_progress > 0 && (
                 <span className="ml-1.5 text-xs tabular-nums opacity-60">
                   {statusCounts.in_progress}
@@ -316,7 +335,7 @@ export function InboxClient({
               )}
             </TabsTrigger>
             <TabsTrigger value="resolved">
-              Résolus
+              Resolved
               {statusCounts.resolved > 0 && (
                 <span className="ml-1.5 text-xs tabular-nums opacity-60">
                   {statusCounts.resolved}
@@ -324,14 +343,14 @@ export function InboxClient({
               )}
             </TabsTrigger>
             <TabsTrigger value="archived">
-              Archivés
+              Archived
               {statusCounts.archived > 0 && (
                 <span className="ml-1.5 text-xs tabular-nums opacity-60">
                   {statusCounts.archived}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="all">Tous</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -340,7 +359,7 @@ export function InboxClient({
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Chercher…"
+            placeholder="Search…"
             className="pl-8 pr-8"
           />
           {q && (
@@ -357,8 +376,8 @@ export function InboxClient({
       {/* Pills */}
       {(projects.length > 0 || contributors.length > 0 || urls.length > 0) && (
         <div className="mt-4 space-y-3">
-          {projects.length > 0 && (
-            <FilterRow label="Projet">
+          {!lockedProjectSlug && projects.length > 0 && (
+            <FilterRow label="Project">
               {projects.map((p) => {
                 const active = projectsSel.includes(p.slug);
                 return (
@@ -384,7 +403,7 @@ export function InboxClient({
           )}
 
           {contributors.length > 0 && (
-            <FilterRow label="Contributeur">
+            <FilterRow label="Contributor">
               {contributors.map(([name, count]) => {
                 const active = contributorsSel.includes(name);
                 return (
@@ -705,14 +724,14 @@ function buildJsonExport(comments: Comment[]) {
     version: 2,
     exportedAt: new Date().toISOString(),
     prompt: [
-      "Tu reçois une liste de retours capturés sur un site live via l'extension feeeeedback.",
-      "Pour chaque item :",
-      "- `feedback` : ce qu'un utilisateur (champ `from`) a remonté en pointant un élément précis de la page. C'est sa voix, brute.",
-      "- `action` : ce que moi (Product Owner) je te demande de faire en réponse. C'est l'instruction à exécuter.",
-      "- `element.selector` te permet de cibler exactement l'élément concerné.",
-      "- `page.url` est la page où le retour a été pris ; utilise-la pour retrouver le composant dans le code.",
-      "Concentre-toi sur le champ `action` pour savoir quoi coder. Le `feedback` te donne le pourquoi.",
-      "Ignore les items dont `status` vaut `archived` ou `resolved` sauf demande explicite.",
+      "You are receiving a list of feedback captured on a live website via the feeeeedback extension.",
+      "For each item:",
+      "- `feedback`: what a user (the `from` field) reported by pointing at a specific element of the page. Their raw voice.",
+      "- `action`: what I (Product Owner) am asking you to do in response. The instruction to execute.",
+      "- `element.selector` lets you target the exact element concerned.",
+      "- `page.url` is the page where the feedback was captured; use it to locate the component in the code.",
+      "Focus on the `action` field for what to code. The `feedback` gives you the why.",
+      "Ignore items whose `status` is `archived` or `resolved` unless explicitly asked.",
     ].join("\n"),
     count: comments.length,
     items: comments.map((c) => ({
@@ -794,7 +813,7 @@ function SelectionBar({
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-200">
       <div className="bg-foreground text-background rounded-xl shadow-2xl px-2 py-2 flex items-center gap-1 flex-wrap max-w-[95vw]">
         <span className="px-3 text-sm font-medium tabular-nums">
-          {selected.size} sélectionné{selected.size > 1 ? "s" : ""}
+          {selected.size} selected
         </span>
         <span className="w-px h-5 bg-background/20" />
         <Button
@@ -803,7 +822,7 @@ function SelectionBar({
           className="text-background hover:bg-background/10 hover:text-background"
           onClick={allFilteredSelected ? onDeselectAll : onSelectAll}
         >
-          {allFilteredSelected ? "Désélectionner la vue" : "Sélectionner la vue"}
+          {allFilteredSelected ? "Deselect all" : "Select all"}
         </Button>
         <Button
           size="sm"
@@ -811,7 +830,7 @@ function SelectionBar({
           className="text-background hover:bg-background/10 hover:text-background"
           onClick={onClear}
         >
-          Effacer
+          Clear
         </Button>
         <span className="w-px h-5 bg-background/20" />
         <Button
@@ -821,7 +840,7 @@ function SelectionBar({
           className="text-background hover:bg-background/10 hover:text-background"
           onClick={() => bulkStatus("in_progress", "in_progress")}
         >
-          {busy === "in_progress" ? "…" : "En cours"}
+          {busy === "in_progress" ? "…" : "In progress"}
         </Button>
         <Button
           size="sm"
@@ -830,7 +849,7 @@ function SelectionBar({
           className="text-background hover:bg-background/10 hover:text-background"
           onClick={() => bulkStatus("resolved", "resolved")}
         >
-          {busy === "resolved" ? "…" : "Résoudre"}
+          {busy === "resolved" ? "…" : "Resolve"}
         </Button>
         <Button
           size="sm"
@@ -839,7 +858,7 @@ function SelectionBar({
           className="text-background hover:bg-background/10 hover:text-background"
           onClick={() => bulkStatus("archived", "archived")}
         >
-          {busy === "archived" ? "…" : "Archiver"}
+          {busy === "archived" ? "…" : "Archive"}
         </Button>
         <span className="w-px h-5 bg-background/20" />
         <Button
@@ -850,11 +869,11 @@ function SelectionBar({
         >
           {copied ? (
             <>
-              <ClipboardCheck className="size-3.5" /> Copié pour Claude
+              <ClipboardCheck className="size-3.5" /> Copied for Claude
             </>
           ) : (
             <>
-              <Copy className="size-3.5" /> Copier en JSON
+              <Copy className="size-3.5" /> Copy as JSON
             </>
           )}
         </Button>
@@ -934,16 +953,16 @@ function EmptyInbox({
         {hasFilters ? <Filter className="size-5" /> : <Inbox className="size-5" />}
       </div>
       <h3 className="text-lg font-medium mb-2">
-        {hasFilters ? "Aucun résultat" : "Aucun retour pour l'instant"}
+        {hasFilters ? "No results" : "No feedback yet"}
       </h3>
       <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
         {hasFilters
-          ? "Essaie d'affiner ou d'effacer les filtres."
-          : "Lance une session dans l'extension et commente un élément — les retours apparaîtront ici."}
+          ? "Try refining or clearing the filters."
+          : "Start a session in the extension and comment on an element — feedback will appear here."}
       </p>
       {!hasFilters && (
         <Button asChild>
-          <Link href={`/${orgSlug}/projects`}>Voir les projets</Link>
+          <Link href={`/${orgSlug}/projects`}>View projects</Link>
         </Button>
       )}
     </Card>
@@ -1057,11 +1076,72 @@ function DrawerBody({
     }
   }
 
+  // Clipboard image paste — uploads to /attachments endpoint, refreshes
+  // the inbox so the new thumbnail appears in the action section.
+  const [pasteUploading, setPasteUploading] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  async function uploadActionImage(file: File) {
+    setPasteUploading(true);
+    setPasteError(null);
+    try {
+      const fd = new FormData();
+      fd.append("kind", "action");
+      fd.append("file", file);
+      const res = await fetch(
+        `/api/v1/comments/${comment.id}/attachments`,
+        { method: "POST", body: fd }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Upload failed");
+      }
+      router.refresh();
+    } catch (err) {
+      setPasteError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setPasteUploading(false);
+    }
+  }
+
+  async function removeAttachment(path: string) {
+    if (!confirm("Remove this attachment?")) return;
+    await fetch(
+      `/api/v1/comments/${comment.id}/attachments?path=${encodeURIComponent(path)}`,
+      { method: "DELETE" }
+    );
+    router.refresh();
+  }
+
+  function onActionPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData.files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (!files.length) return;
+    e.preventDefault();
+    for (const f of files) void uploadActionImage(f);
+  }
+
+  function onActionDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (!files.length) return;
+    e.preventDefault();
+    for (const f of files) void uploadActionImage(f);
+  }
+
+  const feedbackAttachments = (comment.attachments || []).filter(
+    (a) => a.kind === "feedback"
+  );
+  const actionAttachments = (comment.attachments || []).filter(
+    (a) => a.kind === "action"
+  );
+
   const statusActions: Array<{ value: string; label: string }> = [
-    { value: "open", label: "Ouvert" },
-    { value: "in_progress", label: "En cours" },
-    { value: "resolved", label: "Résolu" },
-    { value: "archived", label: "Archivé" },
+    { value: "open", label: "Open" },
+    { value: "in_progress", label: "In progress" },
+    { value: "resolved", label: "Resolved" },
+    { value: "archived", label: "Archived" },
   ];
 
   return (
@@ -1101,7 +1181,7 @@ function DrawerBody({
           variant="ghost"
           onClick={onClose}
           className="ml-1"
-          aria-label="Fermer"
+          aria-label="Close"
         >
           <X className="size-4" />
         </Button>
@@ -1161,11 +1241,16 @@ function DrawerBody({
         <section>
           <div className="flex items-center justify-between mb-2">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-              Action à prendre
+              Action to take
             </div>
-            {actionDirty && (
-              <span className="text-[10px] text-amber-600">Non enregistré</span>
-            )}
+            <div className="flex items-center gap-2">
+              {pasteUploading && (
+                <span className="text-[10px] text-muted-foreground">Uploading…</span>
+              )}
+              {actionDirty && (
+                <span className="text-[10px] text-amber-600">Unsaved</span>
+              )}
+            </div>
           </div>
           <Textarea
             value={actionDraft}
@@ -1174,14 +1259,55 @@ function DrawerBody({
               setActionDirty(true);
             }}
             onBlur={saveAction}
-            placeholder="Décris l'action à prendre — cette note sera incluse dans l'export JSON pour Claude Code."
+            onPaste={onActionPaste}
+            onDrop={onActionDrop}
+            onDragOver={(e) => e.preventDefault()}
+            placeholder="Describe the action to take — paste screenshots from your clipboard. This note will be included in the JSON export for Claude Code."
             rows={4}
             className="resize-y"
           />
+          {pasteError && (
+            <p className="text-xs text-destructive mt-1">{pasteError}</p>
+          )}
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Paste images (⌘V / Ctrl+V) or drag &amp; drop to attach screenshots.
+          </p>
+          {actionAttachments.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {actionAttachments.map((a) => (
+                <div
+                  key={a.path}
+                  className="relative group rounded-md overflow-hidden border bg-muted aspect-[4/3]"
+                >
+                  <a
+                    href={`/api/v1/uploads/${a.path}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full h-full"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/v1/uploads/${a.path}`}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(a.path)}
+                    className="absolute top-1 right-1 size-5 rounded-full bg-background/95 backdrop-blur border opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-muted-foreground hover:text-destructive"
+                    aria-label="Remove"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           {actionDirty && (
             <div className="flex justify-end mt-2">
               <Button size="sm" onClick={saveAction} disabled={actionSaving}>
-                {actionSaving ? "…" : "Enregistrer"}
+                {actionSaving ? "…" : "Save"}
               </Button>
             </div>
           )}
@@ -1190,7 +1316,7 @@ function DrawerBody({
         {/* Status workflow */}
         <section>
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
-            Statut
+            Status
           </div>
           <div className="flex flex-wrap gap-1.5">
             {statusActions.map((s) => {
@@ -1217,7 +1343,7 @@ function DrawerBody({
         {/* Priority */}
         <section>
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
-            Priorité
+            Priority
           </div>
           <div className="flex flex-wrap gap-1.5">
             {(["low", "normal", "high", "urgent"] as const).map((p) => {
@@ -1244,12 +1370,38 @@ function DrawerBody({
         {comment.text && (
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
-              Texte de l'élément
+              Element text
             </div>
             <blockquote className="border-l-2 border-[color:var(--brand)] pl-4 py-1 text-sm italic text-muted-foreground">
               &laquo;&nbsp;{comment.text}&nbsp;&raquo;
             </blockquote>
           </div>
+        )}
+
+        {feedbackAttachments.length > 0 && (
+          <section>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+              Feedback attachments
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {feedbackAttachments.map((a) => (
+                <a
+                  key={a.path}
+                  href={`/api/v1/uploads/${a.path}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-md overflow-hidden border bg-muted aspect-[4/3]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/v1/uploads/${a.path}`}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          </section>
         )}
 
         <Separator />
@@ -1275,11 +1427,11 @@ function DrawerBody({
             </Button>
           </MetaRow>
           {comment.pageTitle && (
-            <MetaRow label="Titre">
+            <MetaRow label="Title">
               <span className="text-sm truncate">{comment.pageTitle}</span>
             </MetaRow>
           )}
-          <MetaRow label="Sélecteur">
+          <MetaRow label="Selector">
             <code className="text-xs font-mono truncate">{comment.selector}</code>
             <Button
               size="icon"
@@ -1308,9 +1460,9 @@ function DrawerBody({
           variant="ghost"
           onClick={onPrev}
           disabled={index <= 0}
-          aria-label="Précédent"
+          aria-label="Previous"
         >
-          <ChevronLeft className="size-4" /> Précédent
+          <ChevronLeft className="size-4" /> Previous
         </Button>
         <span className="text-xs text-muted-foreground tabular-nums px-2">
           {index + 1} / {total}
@@ -1320,9 +1472,9 @@ function DrawerBody({
           variant="ghost"
           onClick={onNext}
           disabled={index >= total - 1}
-          aria-label="Suivant"
+          aria-label="Next"
         >
-          Suivant <ChevronRight className="size-4" />
+          Next <ChevronRight className="size-4" />
         </Button>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground hidden sm:inline">
@@ -1331,7 +1483,7 @@ function DrawerBody({
           </span>
           <Button asChild size="sm">
             <a href={comment.url} target="_blank" rel="noreferrer">
-              Ouvrir la page <ExternalLink className="size-3.5" />
+              Open page <ExternalLink className="size-3.5" />
             </a>
           </Button>
         </div>

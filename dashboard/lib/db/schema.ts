@@ -209,6 +209,10 @@ export const comment = pgTable(
     status: text("status").notNull().default("open"),
     priority: text("priority").notNull().default("normal"),
     actionNote: text("action_note"),
+    attachments: jsonb("attachments")
+      .$type<Array<{ path: string; kind: "feedback" | "action"; addedAt: string }>>()
+      .notNull()
+      .default([]),
     resolvedAt: timestamp("resolved_at"),
     resolvedBy: text("resolved_by").references(() => user.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),

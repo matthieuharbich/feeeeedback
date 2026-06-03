@@ -124,31 +124,94 @@
     panelEl.innerHTML = `
       <div class="ff-panel-header">
         <span class="ff-panel-title">feeeeedback</span>
-        <button class="ff-icon-btn" data-ff-close title="Fermer">✕</button>
+        <button class="ff-icon-btn" data-ff-close title="Close">✕</button>
       </div>
       <div class="ff-panel-meta">
         <div class="ff-panel-selector"></div>
         <div class="ff-panel-text"></div>
       </div>
-      <textarea class="ff-panel-textarea" placeholder="Ton commentaire…" rows="4"></textarea>
+      <textarea class="ff-panel-textarea" placeholder="Your feedback… (paste images with ⌘V)" rows="4"></textarea>
+      <div class="ff-attachments" data-ff-attachments hidden></div>
       <div class="ff-importance" role="radiogroup" aria-label="Importance">
-        <button type="button" class="ff-imp" data-ff-imp="low">Pas important</button>
+        <button type="button" class="ff-imp" data-ff-imp="low">Not important</button>
         <button type="button" class="ff-imp ff-imp-active" data-ff-imp="high">Important</button>
-        <button type="button" class="ff-imp" data-ff-imp="urgent">Super important</button>
+        <button type="button" class="ff-imp" data-ff-imp="urgent">Critical</button>
       </div>
       <div class="ff-panel-actions">
-        <button class="ff-btn ff-btn-ghost" data-ff-cancel>Annuler</button>
-        <button class="ff-btn ff-btn-primary" data-ff-save>Enregistrer</button>
+        <button class="ff-btn ff-btn-ghost" data-ff-cancel>Cancel</button>
+        <button class="ff-btn ff-btn-primary" data-ff-save>Save</button>
       </div>
     `;
     panelEl.querySelector(".ff-panel-selector").textContent = selector;
-    panelEl.querySelector(".ff-panel-text").textContent = text || "(aucun texte)";
+    panelEl.querySelector(".ff-panel-text").textContent = text || "(no text)";
 
     document.documentElement.appendChild(panelEl);
     positionPanel(rect);
 
     const textarea = panelEl.querySelector(".ff-panel-textarea");
     textarea.focus();
+
+    // Clipboard / drag-and-drop image attachments
+    const pastedAttachments = [];
+    const attBox = panelEl.querySelector("[data-ff-attachments]");
+
+    function refreshAttachments() {
+      if (!attBox) return;
+      attBox.innerHTML = "";
+      if (!pastedAttachments.length) {
+        attBox.setAttribute("hidden", "");
+        return;
+      }
+      attBox.removeAttribute("hidden");
+      pastedAttachments.forEach((att, idx) => {
+        const t = document.createElement("div");
+        t.className = "ff-att-thumb";
+        t.innerHTML = `
+          <img src="${att.url}" alt="" />
+          <button type="button" class="ff-att-remove" data-ff-att-remove="${idx}" title="Remove">✕</button>
+        `;
+        attBox.appendChild(t);
+      });
+      attBox.querySelectorAll("[data-ff-att-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const i = Number(btn.getAttribute("data-ff-att-remove"));
+          const a = pastedAttachments[i];
+          if (a?.url) URL.revokeObjectURL(a.url);
+          pastedAttachments.splice(i, 1);
+          refreshAttachments();
+        });
+      });
+    }
+
+    function addImageFile(file) {
+      if (!file || !file.type?.startsWith("image/")) return;
+      if (file.size > 6 * 1024 * 1024) return; // ≤ 6 MB
+      const url = URL.createObjectURL(file);
+      pastedAttachments.push({ file, url });
+      refreshAttachments();
+    }
+
+    textarea.addEventListener("paste", (e) => {
+      const items = Array.from(e.clipboardData?.items || []);
+      const imgs = items
+        .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+        .map((it) => it.getAsFile())
+        .filter(Boolean);
+      if (imgs.length) {
+        e.preventDefault();
+        imgs.forEach(addImageFile);
+      }
+    });
+    textarea.addEventListener("drop", (e) => {
+      const files = Array.from(e.dataTransfer?.files || []).filter((f) =>
+        f.type.startsWith("image/")
+      );
+      if (files.length) {
+        e.preventDefault();
+        files.forEach(addImageFile);
+      }
+    });
+    textarea.addEventListener("dragover", (e) => e.preventDefault());
 
     let importance = "high";
     panelEl.querySelectorAll("[data-ff-imp]").forEach((btn) => {
@@ -171,7 +234,7 @@
       const saveBtn = panelEl.querySelector("[data-ff-save]");
       const prevLabel = saveBtn.textContent;
       saveBtn.disabled = true;
-      saveBtn.textContent = sessionMeta?.mode === "cloud" ? "Envoi…" : "Enregistrement…";
+      saveBtn.textContent = sessionMeta?.mode === "cloud" ? "Sending…" : "Saving…";
       try {
         const elementRect = {
           x: rect.left + window.scrollX,
@@ -197,7 +260,9 @@
             width: rect.width,
             height: rect.height,
           },
+          feedbackAttachments: pastedAttachments.map((a) => a.file),
         });
+        pastedAttachments.forEach((a) => a.url && URL.revokeObjectURL(a.url));
         closeCommentPanel(false);
       } catch (err) {
         saveBtn.disabled = false;
@@ -209,7 +274,7 @@
           panelEl.insertBefore(el, panelEl.querySelector(".ff-panel-actions"));
           return el;
         })();
-        errEl.textContent = err?.message || "Erreur lors de l'enregistrement";
+        errEl.textContent = err?.message || "Save failed";
       }
     });
     textarea.addEventListener("keydown", (e) => {
@@ -283,6 +348,7 @@
         screenshotBlob,
         screenshotWidth,
         screenshotHeight,
+        feedbackAttachments: data.feedbackAttachments || [],
       });
       // also keep a local copy for immediate widget display
       const updated = await chrome.runtime.sendMessage({
