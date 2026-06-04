@@ -824,13 +824,13 @@ function SelectionBar({
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [building, setBuilding] = useState(false);
 
   if (selected.size === 0) return null;
 
   const selectedComments = comments.filter((c) => selected.has(c.id));
   const selectedIds = selectedComments.map((c) => c.id);
 
-  const [building, setBuilding] = useState(false);
   async function copyJson() {
     if (building) return;
     setBuilding(true);
