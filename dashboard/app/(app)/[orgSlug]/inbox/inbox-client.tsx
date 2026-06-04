@@ -718,65 +718,47 @@ function CommentCard({
 
 // ---------- JSON export + selection bar ----------
 
-async function fetchAsDataUrl(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  try {
-    const res = await fetch(`/api/v1/uploads/${path}`, { credentials: "include" });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const r = reader.result;
-        resolve(typeof r === "string" ? r : null);
-      };
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
+function publicAttachmentUrl(path: string): string {
+  const base =
+    (typeof window !== "undefined" && window.location.origin) ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "";
+  return `${base}/api/v1/public/uploads/${encodeURIComponent(path)}`;
 }
 
-async function buildJsonExport(comments: Comment[]) {
-  const items = await Promise.all(
-    comments.map(async (c, i) => {
-      const feedbackAtts = (c.attachments || []).filter((a) => a.kind === "feedback");
-      const actionAtts = (c.attachments || []).filter((a) => a.kind === "action");
-      const [feedbackAttachments, actionAttachments] = await Promise.all([
-        Promise.all(feedbackAtts.map((a) => fetchAsDataUrl(a.path))),
-        Promise.all(actionAtts.map((a) => fetchAsDataUrl(a.path))),
-      ]);
-      return {
-        index: i + 1,
-        feedback: c.comment,
-        action: c.actionNote || null,
-        from: c.contributorName || null,
-        project: c.projectName,
-        status: c.status,
-        priority: c.priority,
-        page: {
-          url: c.url,
-          title: c.pageTitle || null,
-          viewport:
-            c.viewportWidth && c.viewportHeight
-              ? { width: c.viewportWidth, height: c.viewportHeight }
-              : null,
-        },
-        element: {
-          selector: c.selector,
-          tag: c.tagName || null,
-          text: c.text || null,
-        },
-        feedbackAttachments: feedbackAttachments.filter(Boolean),
-        actionAttachments: actionAttachments.filter(Boolean),
-        createdAt: c.createdAt,
-      };
-    })
-  );
+function buildJsonExport(comments: Comment[]) {
+  const items = comments.map((c, i) => {
+    const feedbackAtts = (c.attachments || []).filter((a) => a.kind === "feedback");
+    const actionAtts = (c.attachments || []).filter((a) => a.kind === "action");
+    return {
+      index: i + 1,
+      feedback: c.comment,
+      action: c.actionNote || null,
+      from: c.contributorName || null,
+      project: c.projectName,
+      status: c.status,
+      priority: c.priority,
+      page: {
+        url: c.url,
+        title: c.pageTitle || null,
+        viewport:
+          c.viewportWidth && c.viewportHeight
+            ? { width: c.viewportWidth, height: c.viewportHeight }
+            : null,
+      },
+      element: {
+        selector: c.selector,
+        tag: c.tagName || null,
+        text: c.text || null,
+      },
+      feedbackAttachments: feedbackAtts.map((a) => publicAttachmentUrl(a.path)),
+      actionAttachments: actionAtts.map((a) => publicAttachmentUrl(a.path)),
+      createdAt: c.createdAt,
+    };
+  });
   return {
     tool: "feeeeedback",
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     prompt: [
       "You are receiving a list of feedback captured on a live website via the feeeeedback extension.",
@@ -786,8 +768,8 @@ async function buildJsonExport(comments: Comment[]) {
       "- `action`: what I (Product Owner) am asking you to do about it. The instruction to execute — the *what*.",
       "- `element.selector` lets you locate the exact element in the DOM. Use it to find the component in the code.",
       "- `page.url` is the page where the feedback was captured.",
-      "- `feedbackAttachments`: array of base64 data URLs — extra screenshots the contributor pasted while writing the feedback. Inspect them.",
-      "- `actionAttachments`: array of base64 data URLs — screenshots I (PO) pasted in the action note to show you exactly what I want. Inspect them carefully; they're the visual spec.",
+      "- `feedbackAttachments`: array of public image URLs — extra screenshots the contributor pasted while writing the feedback. Fetch them and inspect.",
+      "- `actionAttachments`: array of public image URLs — screenshots I (PO) pasted in the action note to show you exactly what I want. Fetch them and inspect carefully; they're the visual spec.",
       "",
       "Workflow — VERY IMPORTANT:",
       "- Implement each item independently.",
@@ -824,7 +806,6 @@ function SelectionBar({
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [building, setBuilding] = useState(false);
 
   if (selected.size === 0) return null;
 
@@ -832,16 +813,10 @@ function SelectionBar({
   const selectedIds = selectedComments.map((c) => c.id);
 
   async function copyJson() {
-    if (building) return;
-    setBuilding(true);
-    try {
-      const payload = await buildJsonExport(selectedComments);
-      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } finally {
-      setBuilding(false);
-    }
+    const payload = buildJsonExport(selectedComments);
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
   }
 
   async function bulkStatus(status: string, label: string) {
@@ -919,16 +894,11 @@ function SelectionBar({
           size="sm"
           variant="secondary"
           onClick={copyJson}
-          disabled={building}
           className="bg-background text-foreground hover:bg-background/90"
         >
           {copied ? (
             <>
               <ClipboardCheck className="size-3.5" /> Copied for Claude
-            </>
-          ) : building ? (
-            <>
-              <Copy className="size-3.5 animate-pulse" /> Embedding images…
             </>
           ) : (
             <>
