@@ -718,23 +718,20 @@ function CommentCard({
 
 // ---------- JSON export + selection bar ----------
 
+function publicAttachmentUrl(path: string): string {
+  const base =
+    (typeof window !== "undefined" && window.location.origin) ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "";
+  return `${base}/api/v1/public/uploads/${encodeURIComponent(path)}`;
+}
+
 function buildJsonExport(comments: Comment[]) {
-  return {
-    tool: "feeeeedback",
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    prompt: [
-      "You are receiving a list of feedback captured on a live website via the feeeeedback extension.",
-      "For each item:",
-      "- `feedback`: what a user (the `from` field) reported by pointing at a specific element of the page. Their raw voice.",
-      "- `action`: what I (Product Owner) am asking you to do in response. The instruction to execute.",
-      "- `element.selector` lets you target the exact element concerned.",
-      "- `page.url` is the page where the feedback was captured; use it to locate the component in the code.",
-      "Focus on the `action` field for what to code. The `feedback` gives you the why.",
-      "Ignore items whose `status` is `archived` or `resolved` unless explicitly asked.",
-    ].join("\n"),
-    count: comments.length,
-    items: comments.map((c) => ({
+  const items = comments.map((c, i) => {
+    const feedbackAtts = (c.attachments || []).filter((a) => a.kind === "feedback");
+    const actionAtts = (c.attachments || []).filter((a) => a.kind === "action");
+    return {
+      index: i + 1,
       feedback: c.comment,
       action: c.actionNote || null,
       from: c.contributorName || null,
@@ -754,8 +751,54 @@ function buildJsonExport(comments: Comment[]) {
         tag: c.tagName || null,
         text: c.text || null,
       },
+      feedbackAttachments: feedbackAtts.map((a) => publicAttachmentUrl(a.path)),
+      actionAttachments: actionAtts.map((a) => publicAttachmentUrl(a.path)),
       createdAt: c.createdAt,
-    })),
+    };
+  });
+  return {
+    tool: "feeeeedback",
+    version: 5,
+    exportedAt: new Date().toISOString(),
+    prompt: [
+      "You are receiving a list of feedback captured on a live website via the feeeeedback extension.",
+      "",
+      "For each item:",
+      "- `feedback`: what a user (the `from` field) reported by pointing at a specific element. The raw user voice — the *why*.",
+      "- `action`: what I (Product Owner) am asking you to do about it. The instruction to execute — the *what*.",
+      "- `element.selector` lets you locate the exact element in the DOM. Use it to find the component in the code.",
+      "- `page.url` is the page where the feedback was captured.",
+      "- `feedbackAttachments`: array of public image URLs — extra screenshots the contributor pasted while writing the feedback. Fetch them and inspect.",
+      "- `actionAttachments`: array of public image URLs — screenshots I (PO) pasted in the action note to show you exactly what I want. Fetch them and inspect carefully; they're the visual spec.",
+      "",
+      "Workflow — VERY IMPORTANT, do this for EACH item in order:",
+      "",
+      "1. **Open a GitHub issue** for the item. The issue must be super clean and clear:",
+      "   - Title: short, verb-first, scoped — describes the change in one line.",
+      "     Examples: `Align Submit button to grid on mobile checkout`, `Add bulk archive button to inbox selection bar`.",
+      "   - Body, in this exact order:",
+      "     - **Feedback** — quote the `feedback` field verbatim, attribute to `from` if present.",
+      "     - **Action** — quote the `action` field verbatim. This is what we'll implement.",
+      "     - **Context** — `page.url`, `element.selector`, `element.tag`/`element.text` when relevant.",
+      "     - **Screenshots** — embed every URL from `feedbackAttachments` and `actionAttachments` as `![](url)` so they render inline in the issue. Do not omit any.",
+      "     - **Source** — `feeeeedback item #<index>`, captured `createdAt`.",
+      "   - No fluff, no preamble, no \"I'll now…\". The issue reads like a clean spec.",
+      "",
+      "2. **Implement** the action.",
+      "",
+      "3. **Commit ONCE per feedback item**. Never bundle multiple items into the same commit.",
+      "   - Verb-first, scoped, super explicit message describing exactly what changed. Examples:",
+      "     - `fix: align Submit button to grid on mobile checkout`",
+      "     - `feat(inbox): add bulk archive button in selection bar`",
+      "     - `style(nav): switch active link color from blue-500 to brand orange`",
+      "   - **End the commit body with `Closes #<issue-number>`** so GitHub auto-links the commit to the issue and closes it on merge.",
+      "   - One commit per item keeps every implementation isolated, reviewable, and revertible.",
+      "",
+      "Focus on the `action` field for what to code. Use `feedback` for context and the attachments for the visual.",
+      "Ignore items whose `status` is `archived` or `resolved` unless explicitly asked.",
+    ].join("\n"),
+    count: comments.length,
+    items,
   };
 }
 
