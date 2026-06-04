@@ -740,15 +740,15 @@ async function fetchAsDataUrl(path: string | null): Promise<string | null> {
 
 async function buildJsonExport(comments: Comment[]) {
   const items = await Promise.all(
-    comments.map(async (c) => {
+    comments.map(async (c, i) => {
       const feedbackAtts = (c.attachments || []).filter((a) => a.kind === "feedback");
       const actionAtts = (c.attachments || []).filter((a) => a.kind === "action");
-      const [screenshot, feedbackAttachments, actionAttachments] = await Promise.all([
-        fetchAsDataUrl(c.screenshotPath),
+      const [feedbackAttachments, actionAttachments] = await Promise.all([
         Promise.all(feedbackAtts.map((a) => fetchAsDataUrl(a.path))),
         Promise.all(actionAtts.map((a) => fetchAsDataUrl(a.path))),
       ]);
       return {
+        index: i + 1,
         feedback: c.comment,
         action: c.actionNote || null,
         from: c.contributorName || null,
@@ -768,7 +768,6 @@ async function buildJsonExport(comments: Comment[]) {
           tag: c.tagName || null,
           text: c.text || null,
         },
-        screenshot: screenshot || null,
         feedbackAttachments: feedbackAttachments.filter(Boolean),
         actionAttachments: actionAttachments.filter(Boolean),
         createdAt: c.createdAt,
@@ -777,18 +776,29 @@ async function buildJsonExport(comments: Comment[]) {
   );
   return {
     tool: "feeeeedback",
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     prompt: [
       "You are receiving a list of feedback captured on a live website via the feeeeedback extension.",
+      "",
       "For each item:",
-      "- `feedback`: what a user (the `from` field) reported by pointing at a specific element of the page. Their raw voice.",
-      "- `action`: what I (Product Owner) am asking you to do in response. The instruction to execute.",
-      "- `element.selector` lets you target the exact element concerned.",
-      "- `page.url` is the page where the feedback was captured; use it to locate the component in the code.",
-      "- `screenshot` is a base64 data URL of the captured element with some surrounding context. Inspect it to see exactly what the user is talking about.",
-      "- `feedbackAttachments` and `actionAttachments` are arrays of base64 data URLs — additional screenshots pasted by the contributor or the PO. Inspect them too.",
-      "Focus on the `action` field for what to code. The `feedback` gives you the why. The screenshots tell you the look.",
+      "- `feedback`: what a user (the `from` field) reported by pointing at a specific element. The raw user voice — the *why*.",
+      "- `action`: what I (Product Owner) am asking you to do about it. The instruction to execute — the *what*.",
+      "- `element.selector` lets you locate the exact element in the DOM. Use it to find the component in the code.",
+      "- `page.url` is the page where the feedback was captured.",
+      "- `feedbackAttachments`: array of base64 data URLs — extra screenshots the contributor pasted while writing the feedback. Inspect them.",
+      "- `actionAttachments`: array of base64 data URLs — screenshots I (PO) pasted in the action note to show you exactly what I want. Inspect them carefully; they're the visual spec.",
+      "",
+      "Workflow — VERY IMPORTANT:",
+      "- Implement each item independently.",
+      "- Create **ONE git commit per feedback item**. Never bundle multiple items into the same commit.",
+      "- Each commit message must be SUPER EXPLICIT: verb-first, scoped, describing exactly what changed. Examples:",
+      "  - `fix: align Submit button to grid on mobile checkout`",
+      "  - `feat(inbox): add bulk archive button in selection bar`",
+      "  - `style(nav): switch active link color from blue-500 to brand orange`",
+      "- This is non-negotiable: one commit per item keeps every implementation isolated, reviewable, and revertible.",
+      "",
+      "Focus on the `action` field for what to code. Use `feedback` for context and the attachments for the visual.",
       "Ignore items whose `status` is `archived` or `resolved` unless explicitly asked.",
     ].join("\n"),
     count: comments.length,
