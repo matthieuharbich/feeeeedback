@@ -718,10 +718,66 @@ function CommentCard({
 
 // ---------- JSON export + selection bar ----------
 
-function buildJsonExport(comments: Comment[]) {
+async function fetchAsDataUrl(path: string | null): Promise<string | null> {
+  if (!path) return null;
+  try {
+    const res = await fetch(`/api/v1/uploads/${path}`, { credentials: "include" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const r = reader.result;
+        resolve(typeof r === "string" ? r : null);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function buildJsonExport(comments: Comment[]) {
+  const items = await Promise.all(
+    comments.map(async (c) => {
+      const feedbackAtts = (c.attachments || []).filter((a) => a.kind === "feedback");
+      const actionAtts = (c.attachments || []).filter((a) => a.kind === "action");
+      const [screenshot, feedbackAttachments, actionAttachments] = await Promise.all([
+        fetchAsDataUrl(c.screenshotPath),
+        Promise.all(feedbackAtts.map((a) => fetchAsDataUrl(a.path))),
+        Promise.all(actionAtts.map((a) => fetchAsDataUrl(a.path))),
+      ]);
+      return {
+        feedback: c.comment,
+        action: c.actionNote || null,
+        from: c.contributorName || null,
+        project: c.projectName,
+        status: c.status,
+        priority: c.priority,
+        page: {
+          url: c.url,
+          title: c.pageTitle || null,
+          viewport:
+            c.viewportWidth && c.viewportHeight
+              ? { width: c.viewportWidth, height: c.viewportHeight }
+              : null,
+        },
+        element: {
+          selector: c.selector,
+          tag: c.tagName || null,
+          text: c.text || null,
+        },
+        screenshot: screenshot || null,
+        feedbackAttachments: feedbackAttachments.filter(Boolean),
+        actionAttachments: actionAttachments.filter(Boolean),
+        createdAt: c.createdAt,
+      };
+    })
+  );
   return {
     tool: "feeeeedback",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     prompt: [
       "You are receiving a list of feedback captured on a live website via the feeeeedback extension.",
@@ -730,32 +786,13 @@ function buildJsonExport(comments: Comment[]) {
       "- `action`: what I (Product Owner) am asking you to do in response. The instruction to execute.",
       "- `element.selector` lets you target the exact element concerned.",
       "- `page.url` is the page where the feedback was captured; use it to locate the component in the code.",
-      "Focus on the `action` field for what to code. The `feedback` gives you the why.",
+      "- `screenshot` is a base64 data URL of the captured element with some surrounding context. Inspect it to see exactly what the user is talking about.",
+      "- `feedbackAttachments` and `actionAttachments` are arrays of base64 data URLs — additional screenshots pasted by the contributor or the PO. Inspect them too.",
+      "Focus on the `action` field for what to code. The `feedback` gives you the why. The screenshots tell you the look.",
       "Ignore items whose `status` is `archived` or `resolved` unless explicitly asked.",
     ].join("\n"),
     count: comments.length,
-    items: comments.map((c) => ({
-      feedback: c.comment,
-      action: c.actionNote || null,
-      from: c.contributorName || null,
-      project: c.projectName,
-      status: c.status,
-      priority: c.priority,
-      page: {
-        url: c.url,
-        title: c.pageTitle || null,
-        viewport:
-          c.viewportWidth && c.viewportHeight
-            ? { width: c.viewportWidth, height: c.viewportHeight }
-            : null,
-      },
-      element: {
-        selector: c.selector,
-        tag: c.tagName || null,
-        text: c.text || null,
-      },
-      createdAt: c.createdAt,
-    })),
+    items,
   };
 }
 
@@ -783,11 +820,18 @@ function SelectionBar({
   const selectedComments = comments.filter((c) => selected.has(c.id));
   const selectedIds = selectedComments.map((c) => c.id);
 
+  const [building, setBuilding] = useState(false);
   async function copyJson() {
-    const payload = buildJsonExport(selectedComments);
-    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+    if (building) return;
+    setBuilding(true);
+    try {
+      const payload = await buildJsonExport(selectedComments);
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } finally {
+      setBuilding(false);
+    }
   }
 
   async function bulkStatus(status: string, label: string) {
@@ -865,11 +909,16 @@ function SelectionBar({
           size="sm"
           variant="secondary"
           onClick={copyJson}
+          disabled={building}
           className="bg-background text-foreground hover:bg-background/90"
         >
           {copied ? (
             <>
               <ClipboardCheck className="size-3.5" /> Copied for Claude
+            </>
+          ) : building ? (
+            <>
+              <Copy className="size-3.5 animate-pulse" /> Embedding images…
             </>
           ) : (
             <>
